@@ -1,0 +1,81 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Risposte al Questionario</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="{% static 'styles/risposte_domande.css' %}" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Risposte al Questionario</h1>
+
+      <h2>Domande dalla JD / dal Resume</h2>
+      {% if qa_pairs and qa_pairs|length > 0 %}
+        <ul>
+          {% for domanda, risposta in qa_pairs %}
+            <li>
+              {{ domanda }} - Risposta:
+              <span class="{% if risposta|lower == 'si' %}
+                  yes
+                {% elif risposta|lower == 'no' %}
+                  no
+                {% else %}
+                  neutral
+                {% endif %}">
+                {{ risposta }}
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">Nessuna risposta disponibile.</p>
+      {% endif %}
+
+      <h2>Domande sui GAP (AI)</h2>
+
+      {% if gap_summary %}
+        <p class="muted">
+          Sì: <strong>{{ gap_summary.yes|default:0 }}</strong> · No: <strong>{{ gap_summary.no|default:0 }}</strong> · Totale Sì/No: <strong>{{ gap_summary.total_yesno|default:0 }}</strong>
+          {% if gap_overall %}
+            · Valutazione complessiva: <strong>{{ gap_overall }}</strong>
+          {% endif %}
+        </p>
+      {% endif %}
+
+      {% if gap_answers and gap_answers|length > 0 %}
+        <ul>
+          {% for a in gap_answers %}
+            <li>
+              <strong>#{{ forloop.counter }}</strong>
+              {% if a.skill %}
+                <em>({{ a.skill }})</em>
+              {% endif %}—{% if a.type == 'yesno' %}
+                Risposta:
+                <span class="{% if a.value|lower == 'si' %}
+                    yes
+                  {% elif a.value|lower == 'no' %}
+                    no
+                  {% else %}
+                    neutral
+                  {% endif %}">
+                  {{ a.value|default:'-' }}
+                </span>
+              {% else %}
+                Risposta breve: <q>{{ a.value|default:'-' }}</q>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">Nessuna risposta sui gap.</p>
+      {% endif %}
+
+      <!-- Link diretto alla pagina Vue dei candidati -->
+      <p style="margin-top:16px;">
+        <a class="btn" href="/skillcheck/#/Candidati/{{ job_id }}">Torna alla pagina delle candidature</a>
+      </p>
+    </div>
+  </body>
+</html>

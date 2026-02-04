@@ -1,0 +1,77 @@
+/* Stile per il link "SkillCheck" */
+.skillcheck-link {
+    color: #00a200; /* Colore verde */
+    text-decoration: none; /* Rimuove la sottolineatura del link */
+    font-size: 48px; /* Dimensione del font */
+    font-family: 'Arial', sans-serif; /* Specifica il font desiderato */
+}
+
+/* Stile per il titolo "Carica Candidatura" */
+h1 {
+    text-align: center; /* Allinea il testo al centro */
+    color: #00a200; /* Colore verde */
+    font-size: 36px; /* Dimensione del font */
+    margin-bottom: 20px; /* Spazio inferiore */
+}
+
+/* Stile per il form */
+.apply-form {
+    max-width: 600px; /* Larghezza massima del form */
+    margin: 0 auto; /* Centra il form orizzontalmente */
+    padding: 20px; /* Spazio interno al form */
+    border: 1px solid #ccc; /* Bordo del form */
+    border-radius: 5px; /* Bordo arrotondato */
+}
+
+/* Stile per i campi del form */
+.apply-form input[type="text"],
+.apply-form textarea {
+    width: calc(100% - 12px); /* Larghezza del campo (meno il bordo) */
+    padding: 10px; /* Spazio interno al campo */
+    margin-bottom: 10px; /* Spazio inferiore tra i campi */
+    border: 1px solid #ccc; /* Bordo del campo */
+    border-radius: 5px; /* Bordo arrotondato */
+    font-size: 16px; /* Dimensione del font */
+}
+
+/* Stile per il pulsante "Invia Candidatura" */
+.apply-form button[type="submit"] {
+    background-color: #4CAF50; /* Colore di sfondo verde */
+    color: white; /* Colore del testo bianco */
+    padding: 10px 20px; /* Padding interno al pulsante */
+    border: none; /* Nessun bordo */
+    border-radius: 5px; /* Bordo arrotondato */
+    cursor: pointer; /* Cambia il cursore al passaggio del mouse */
+    text-decoration: none; /* Rimuove la sottolineatura del testo */
+    display: block; /* Mostra il pulsante come blocco */
+    width: 100%; /* Larghezza del pulsante al 100% */
+    margin-top: 20px; /* Spazio superiore */
+}
+
+/* Stile per le etichette */
+.apply-form label {
+    color: #004d00; /* Colore del testo verde scuro */
+    font-size: 18px; /* Dimensione del font */
+    display: block; /* Mostra l'etichetta come blocco */
+    margin-bottom: 5px; /* Spazio inferiore */
+}
+
+/* Stile per il campo "Nome" */
+#id_full_name {
+    width: calc(100% - 12px); /* Larghezza del campo (meno il bordo) */
+    padding: 10px; /* Spazio interno al campo */
+    margin-bottom: 10px; /* Spazio inferiore tra i campi */
+    border: 1px solid #ccc; /* Bordo del campo */
+    border-radius: 5px; /* Bordo arrotondato */
+    font-size: 16px; /* Dimensione del font */
+}
+
+/* Stile per il campo "Email" */
+#id_email {
+    width: calc(100% - 12px); /* Larghezza del campo (meno il bordo) */
+    padding: 10px; /* Spazio interno al campo */
+    margin-bottom: 10px; /* Spazio inferiore tra i campi */
+    border: 1px solid #ccc; /* Bordo del campo */
+    border-radius: 5px; /* Bordo arrotondato */
+    font-size: 16px; /* Dimensione del font */
+}

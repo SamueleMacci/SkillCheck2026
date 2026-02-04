@@ -1,0 +1,86 @@
+/* Stile per la scritta "SkillCheck" */
+.site-title {
+    color: #00a200; /* Colore verde */
+    text-decoration: none; /* Rimuove la sottolineatura del link */
+    font-size: 48px; /* Dimensione del font raddoppiata */
+    font-family: 'Arial', sans-serif; /* Specifica il font desiderato */
+}
+
+/* Stile per il campo di descrizione */
+.description-field {
+    width: 80%; /* Allarga il campo di descrizione */
+    font-size: 18px; /* Ingrandisce il font della descrizione */
+}
+
+/* Stile per il pulsante di submit */
+.submit-btn {
+    margin-top: 20px; /* Aggiunge spazio sopra al pulsante */
+    font-size: 18px; /* Ingrandisce il font del pulsante */
+}
+
+
+/* Stile per il titolo "Crea Nuova Job Description" */
+h1 {
+    text-align: center; /* Centra il testo orizzontalmente */
+    color: #00a200; /* Colore verde */
+    font-size: 36px; /* Dimensione del font più grande */
+}
+
+/* Stile per il link "SkillCheck" */
+.skillcheck-link {
+    color: #00a200; /* Colore verde */
+    text-decoration: none; /* Rimuove la sottolineatura del link */
+    font-size: 48px; /* Dimensione del font più grande */
+}
+
+
+/* Stile per il form */
+form {
+    max-width: 600px; /* Larghezza massima del form */
+    margin: 0 auto; /* Centra il form orizzontalmente */
+    padding: 20px; /* Spazio interno al form */
+    border: 1px solid #ccc; /* Bordo del form */
+    border-radius: 5px; /* Bordo arrotondato */
+}
+
+/* Stile per i campi del form */
+form input[type="text"],
+form textarea {
+    width: calc(100% - 12px); /* Larghezza del campo (meno il bordo) */
+    padding: 10px; /* Spazio interno al campo più grande */
+    margin-bottom: 10px; /* Spazio inferiore tra i campi */
+    border: 1px solid #ccc; /* Bordo del campo */
+    border-radius: 5px; /* Bordo arrotondato */
+    font-size: 16px; /* Dimensione del font più grande */
+}
+
+/* Stile per la casella di testo "Descrizione" */
+form textarea {
+    height: 100px; /* Altezza fissa della casella di testo */
+    overflow-y: auto; /* Barra di scorrimento verticale quando necessario */
+}
+
+/* Stile per la casella di testo della descrizione */
+.description-field {
+    width: calc(100% - 12px); /* Allarga il campo di descrizione */
+    font-size: 16px; /* Ingrandisce il font della descrizione */
+    height: 200px;
+    resize: none; /* Impedisce il ridimensionamento della casella di testo */
+}
+
+/* Stile per il pulsante "Salva" */
+form button[type="submit"] {
+    background-color: #4CAF50; /* Colore di sfondo verde */
+    color: white; /* Colore del testo bianco */
+    padding: 10px 20px; /* Padding interno al pulsante */
+    border: none; /* Nessun bordo */
+    border-radius: 5px; /* Bordo arrotondato */
+    cursor: pointer; /* Cambia il cursore al passaggio del mouse */
+    text-decoration: none; /* Rimuove la sottolineatura del testo */
+}
+
+/* Stile per le etichette "Titolo" e "Descrizione" */
+form label {
+    color: #004d00; /* Colore del testo verde scuro */
+    font-size: 20px; /* Dimensione del font ingrandita */
+}

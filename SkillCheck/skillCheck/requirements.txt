@@ -1,0 +1,8 @@
+Django==4.2.7
+djangorestframework==3.14.0
+pdfminer.six==20231228
+scikit_learn==1.4.0
+spacy==3.7.4
+torch==2.1.1
+tqdm==4.66.1
+transformers==4.35.2

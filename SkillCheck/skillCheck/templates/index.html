@@ -1,0 +1,30 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkillCheck - Trova le tue opportunità lavorative</title>
+    <!-- Collegamento al file CSS esterno -->
+    <link rel="stylesheet" href="{% static 'styles/index.css' %}">
+</head>
+<body>
+    <header>
+        <!-- Parte superiore del titolo "Benvenuto su" -->
+        <h1>Benvenuto su</h1>
+        <!-- Parte inferiore del titolo "SkillCheck" -->
+        <h1 class="subtitle">SkillCheck</h1>
+    </header>
+    <main>
+        <section>
+            <!-- Descrizione del sito -->
+            <p class="description">Trova le tue opportunità lavorative qui</p>
+            <!-- Pulsante "Annunci di lavoro" centrato -->
+            <a href="{% url 'job_description_list' %}" class="btn">Annunci di lavoro</a>
+        </section>
+    </main>
+    <footer>
+        <p>Contact us: info@4spark.it</p>
+    </footer>
+</body>
+</html>

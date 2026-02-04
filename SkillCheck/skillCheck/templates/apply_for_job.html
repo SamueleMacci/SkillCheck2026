@@ -1,0 +1,43 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carica Candidatura - SkillCheck</title>
+    <link rel="stylesheet" href="{% static 'styles/apply_for_job.css' %}">
+</head>
+<body>
+    <!-- Link per tornare alla Job Description List (SkillCheck) -->
+    <a href="{% url 'job_description_details' job_description.id %}" class="skillcheck-link">SkillCheck</a>
+
+    <header>
+        <h1>Carica Candidatura</h1>
+    </header>
+
+    <main>
+        <section>
+           <form method="post" action="{% url 'apply_for_job' job_description.id %}" enctype="multipart/form-data" class="apply-form">
+                {% csrf_token %}
+                <!-- Campo per il nome -->
+                <label for="id_name">Nome e Cognome:</label><br>
+                <input type="text" id="id_name" name="name" required>
+
+                <!-- Campo per l'email -->
+                <label for="id_email">Email:</label><br>
+                <input type="email" id="id_email" name="email" required>
+
+                <!-- Campo per il file PDF -->
+                <label for="id_cv">Upload PDF:</label><br>
+                <input type="file" id="id_cv" name="pdf_file_upload" accept=".pdf" required>
+
+                <button type="submit" class="submit-btn">Invia Candidatura</button>
+            </form>
+
+        </section>
+    </main>
+    <footer>
+        <!-- Footer del sito -->
+    </footer>
+</body>
+</html>

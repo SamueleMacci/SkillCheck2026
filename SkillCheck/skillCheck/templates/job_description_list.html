@@ -1,0 +1,36 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elenco Offerte Lavoro - SkillCheck</title>
+    <link rel="stylesheet" href="{% static 'styles/job_description_list.css' %}">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <a href="{% url 'index' %}" class="site-title">SkillCheck</a>
+            <!-- <a href="{% url 'create_job_description' %}" class="yellow-btn">+ Crea un'offerta di lavoro</a> -->
+        </div>
+    </header>
+    <main>
+
+        <section>
+            <ul>
+                {% for job_description in job_descriptions %}
+                    <li class="job-item">
+                        <a href="{% url 'job_description_details' job_description.id %}" class="job-title">{{ job_description.title }}</a>
+                        <p class="job-description">{{ job_description.description|truncatechars:200 }}</p>
+                    </li>
+                {% empty %}
+                    <li>Nessuna offerta di lavoro trovata.</li>
+                {% endfor %}
+            </ul>
+        </section>
+    </main>
+    <footer>
+        <!-- Footer del sito -->
+    </footer>
+</body>
+</html>

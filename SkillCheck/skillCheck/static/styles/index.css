@@ -1,0 +1,51 @@
+/* Stile per il titolo "Benvenuto su" */
+header h1 {
+    text-align: center; /* Centra il testo orizzontalmente */
+    font-size: 4em; /* Imposta la dimensione del testo a 4em */
+    margin-bottom: 0.5em; /* Aggiungi margine inferiore */
+}
+
+/* Stile per il sottotitolo "SkillCheck" */
+header h1.subtitle {
+    text-align: center; /* Centra il testo orizzontalmente */
+    color: #00a200; /* Colore verde */
+    font-size: 6em; /* Imposta la dimensione del testo a 6em */
+    margin-top: 0; /* Rimuovi il margine superiore */
+}
+
+/* Stile per la descrizione del sito */
+.description {
+    text-align: center; /* Centra il testo orizzontalmente */
+    font-size: 2em; /* Imposta la dimensione del testo a 2em */
+    margin-bottom: 2em; /* Aggiungi margine inferiore */
+}
+
+/* Stile per il pulsante "Annunci di lavoro" */
+.btn {
+    display: block; /* Mostra il pulsante come blocco */
+    margin: 0 auto; /* Centra il pulsante orizzontalmente */
+    text-align: center; /* Centra il testo del pulsante */
+    padding: 10px 20px; /* Padding interno al pulsante */
+    background-color: #4CAF50; /* Colore di sfondo verde */
+    color: white; /* Colore del testo bianco */
+    border: none; /* Nessun bordo */
+    cursor: pointer; /* Cambia il cursore al passaggio del mouse */
+    text-decoration: none; /* Rimuove la sottolineatura del testo */
+    border-radius: 5px; /* Bordo arrotondato */
+    max-width: 200px; /* Imposta la larghezza massima del bottone */
+    font-size: 1.2em; /* Imposta la dimensione del testo a 1.2em */
+    transition: background-color 0.3s; /* Aggiungi una transizione per il cambio di colore di sfondo */
+}
+
+/* Stile al passaggio del mouse sul pulsante */
+.btn:hover {
+    background-color: #45a049; /* Cambia il colore di sfondo al passaggio del mouse */
+}
+
+/* Stile per il footer */
+footer {
+    text-align: center; /* Centra il testo orizzontalmente */
+    margin-top: 10em; /* Aggiungi margine superiore */
+    padding: 1em 0; /* Aggiungi padding */
+    background-color: #f2f2f2; /* Colore di sfondo grigio chiaro */
+}

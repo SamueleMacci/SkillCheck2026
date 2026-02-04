@@ -1,0 +1,108 @@
+/* Reset CSS */
+html, body {
+    margin: 0;
+    padding: 0;
+}
+
+/* Global styles */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4; /* Colore di sfondo generale */
+}
+
+/* Header styles */
+header {
+    background: linear-gradient(to right, #9ddcb0, #ffffff); /* Utilizzo di un gradient verde */
+    padding: 10px 20px; /* Padding interno sopra e sotto */
+    display: flex;
+    justify-content: space-between; /* Allinea gli elementi orizzontalmente */
+    align-items: center;
+    position: fixed; /* Fissa l'header in cima alla pagina */
+    top: 0; /* Posiziona l'header all'inizio della pagina */
+    left: 0; /* Posiziona l'header a sinistra */
+    width: 100%; /* Imposta la larghezza al 100% */
+    z-index: 9999; /* Assicura che l'header sia sovrapposto al contenuto */
+    height: 50px; /* Imposta un'altezza fissa per l'header */
+}
+
+
+.skillcheck-link {
+    color: #00a200; /* Colore del testo bianco */
+    text-decoration: none;
+    font-size: 48px;
+    font-family: 'Arial', sans-serif; /* Specifica il font desiderato */
+}
+
+/* Apply button styles */
+.apply-btn {
+    background-color: #218838; /* Colore di sfondo verde scuro */
+    color: #fff; /* Colore del testo bianco */
+    padding: 12px 24px; /* Padding interno */
+    border: none; /* Nessun bordo */
+    border-radius: 5px; /* Bordo arrotondato */
+    cursor: pointer; /* Cambia il cursore al passaggio del mouse */
+    text-decoration: none; /* Rimuove la sottolineatura del testo */
+    transition: background-color 0.3s ease; /* Effetto di transizione sul colore di sfondo */
+}
+
+.apply-btn:hover {
+    background-color: #1e7e34; /* Colore di sfondo verde più scuro al passaggio del mouse */
+}
+
+/* Applications button styles */
+.applications-btn {
+    background-color: #ffc107; /* Colore di sfondo giallo */
+    color: #000; /* Colore del testo nero */
+    padding: 12px 24px; /* Padding interno */
+    border: none; /* Nessun bordo */
+    border-radius: 5px; /* Bordo arrotondato */
+    cursor: pointer; /* Cambia il cursore al passaggio del mouse */
+    text-decoration: none; /* Rimuove la sottolineatura del testo */
+    transition: background-color 0.3s ease; /* Effetto di transizione sul colore di sfondo */
+    margin-right: 50px;
+}
+
+.applications-btn:hover {
+    background-color: #f8c311; /* Colore di sfondo giallo più scuro al passaggio del mouse */
+}
+
+
+/* Main section styles */
+main {
+    margin-top: 80px; /* Aggiunge spazio sopra al main */
+}
+
+.details-section {
+    background-color: #fff; /* Colore di sfondo bianco */
+    border-radius: 5px; /* Bordo arrotondato */
+    padding: 20px; /* Padding interno */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Ombra leggera */
+}
+
+.section-title {
+    color: #0a790a; /* Colore del titolo blu */
+    font-size: 24px; /* Dimensione del font */
+    margin-top: 0; /* Rimuove il margine superiore */
+}
+
+.job-title {
+    color: #02b902; /* Colore del titolo nero */
+    font-size: 20px; /* Dimensione del font */
+    margin-top: 10px; /* Aggiunge spazio sopra al titolo */
+}
+
+.job-description {
+    color: #666; /* Colore del testo grigio */
+    font-size: 16px; /* Dimensione del font */
+    margin-top: 10px; /* Aggiunge spazio sopra alla descrizione */
+    white-space: pre-line; /* Mantiene gli a capo e gli spazi */
+}
+
+/*bottone "Candidati"*/
+.apply-form {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0; /* evita spazi strani */
+}

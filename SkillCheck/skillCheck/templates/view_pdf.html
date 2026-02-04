@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curriculum Visualizzato</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        embed {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <embed src="data:application/pdf;base64,{{ base64_pdf }}" width="100%" height="100%" type="application/pdf">
+
+    <script>
+        // Converti i dati binari del PDF in un oggetto Blob
+        const byteCharacters = atob("{{ pdf_data }}"); // Decodifica i dati binari
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const pdfData = new Blob([byteArray], { type: 'application/pdf' });
+
+        // Crea un URL oggetto per il PDF
+        const pdfUrl = URL.createObjectURL(pdfData);
+
+        // Visualizza il PDF nell'elemento <embed>
+        const pdfContainer = document.getElementById('pdf-container');
+        const embedPdf = document.createElement('embed');
+        embedPdf.src = pdfUrl;
+        embedPdf.width = '100%';
+        embedPdf.height = '100%';
+        pdfContainer.appendChild(embedPdf);
+    </script>
+</body>
+</html>

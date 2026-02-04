@@ -1,0 +1,35 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dettagli Job Description - SkillCheck</title>
+    <link rel="stylesheet" href="{% static 'styles/job_description_details.css' %}">
+</head>
+<body>
+    <header>
+        <!-- Link per tornare alla Home (SkillCheck) -->
+        <a href="{% url 'job_description_list' %}" class="skillcheck-link">SkillCheck</a>
+        <!-- Bottone per candidarsi -->
+        <form action="{% url 'apply_for_job' job_description.id %}" method="post" class="apply-form">
+            {% csrf_token %}
+            <button type="submit" class="apply-btn">Candidati</button>
+        </form>
+        <!-- Bottone per visualizzare le candidature -->
+        <!-- <a href="{% url 'view_applied_resumes' job_description.id %}" class="applications-btn">Candidature</a> -->
+    </header>
+
+    <main>
+        <section class="details-section">
+            <h2 class="section-title">Dettagli dell'Offerta di Lavoro</h2>
+            <h1 class="job-title">{{ job_description.title }}</h1>
+            <p class="job-description">{{ job_description.description }}</p>
+        </section>
+    </main>
+
+    <footer>
+        <!-- Footer del sito -->
+    </footer>
+</body>
+</html>

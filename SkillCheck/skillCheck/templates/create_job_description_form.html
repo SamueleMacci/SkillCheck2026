@@ -1,0 +1,32 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crea Nuova Job Description</title>
+    <link rel="stylesheet" href="{% static 'styles/create_job_description_form.css' %}">
+</head>
+<body>
+    <!-- Link per tornare alla Home (SkillCheck) -->
+    <a href="{% url 'job_description_list' %}" class="skillcheck-link site-title">SkillCheck</a>
+
+    <!-- Titolo del form -->
+    <h1>Crea una nuova Offerta di lavoro</h1>
+
+    <!-- Form per la creazione di una nuova job description -->
+    <form method="post">
+        {% csrf_token %}
+        <!-- Campo per il titolo della job description -->
+        <label for="id_title">Titolo:</label><br>
+        <input type="text" id="id_title" name="title" required><br>
+
+        <!-- Campo per la descrizione della job description -->
+        <label for="id_description">Descrizione:</label><br>
+        <textarea id="id_description" name="description" rows="8" class="description-field" required></textarea><br>
+
+        <!-- Pulsante per salvare la nuova job description -->
+        <button type="submit" class="submit-btn">Salva</button>
+    </form>
+</body>
+</html>

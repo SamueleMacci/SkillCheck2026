@@ -1,0 +1,423 @@
+from urllib.parse import unquote
+from collections import defaultdict
+
+from django.apps import apps
+from django.db.models import Q
+from django.utils.timezone import now
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from rest_framework import status as http_status
+from django.contrib.auth import authenticate, get_user_model
+from django.db import transaction
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.authtoken.models import Token
+import re
+from django.core.files.storage import Storage
+from django.http import HttpRequest
+from decimal import Decimal
+
+# ------------ Model access (robusto a differenze di nomi) ------------
+JD = apps.get_model('skillApp', 'JobDescription')
+# Prova a risolvere il modello dei candidati/applied resumes
+Resume = (apps.get_model('skillApp', 'Resume')
+          or apps.get_model('skillApp', 'AppliedResume')
+          or apps.get_model('skillApp', 'Candidate'))
+
+# Field names probabili / fallback
+def _get(obj, *names, default=None):
+    """Ritorna il primo attributo esistente tra *names*.
+    Se l'attributo è callable, lo chiama senza argomenti.
+    """
+    for n in names:
+        if hasattr(obj, n):
+            try:
+                val = getattr(obj, n)
+                return val() if callable(val) else val
+            except Exception:
+                continue
+    return default
+
+def _abs_url(request: HttpRequest, value):
+    """
+    Restituisce un URL assoluto se 'value' è:
+    - una stringa (già url o path relativo),
+    - un FileField / FieldFile (usa .url),
+    altrimenti None.
+    """
+    if not value:
+        return None
+    try:
+        url = getattr(value, "url", None) or str(value)
+    except Exception:
+        url = str(value)
+    if url.startswith("http://") or url.startswith("https://"):
+        return url
+    try:
+        return request.build_absolute_uri(url)
+    except Exception:
+        return url
+
+def _set(obj, name, value):
+    if hasattr(obj, name):
+        setattr(obj, name, value)
+        return True
+    return False
+
+# mappa inversa per FK dai resume alla JD
+def _fk_name_to_jd():
+    # prova i nomi comuni usati nel repo
+    for field in getattr(Resume, '_meta').get_fields():
+        if getattr(field, 'related_model', None) is JD:
+            return field.name
+    for guess in ('job_description', 'job', 'jd'):
+        if hasattr(Resume, guess):
+            return guess
+    return None
+
+RESUME_FK_TO_JD = _fk_name_to_jd()
+
+def _job_code_for_resume(r):
+    """
+    Ritorna il pk della JD associata a r, gestendo sia FK singola che relazioni many.
+    Fallback a eventuali campi flat (job_code/job/code).
+    """
+    if RESUME_FK_TO_JD and hasattr(r, RESUME_FK_TO_JD):
+        rel = getattr(r, RESUME_FK_TO_JD)
+        if hasattr(rel, 'pk'):
+            return str(rel.pk)
+        try:
+            first = rel.first()
+            if first:
+                return str(first.pk)
+        except Exception:
+            pass
+
+    # Fallback su campi flat
+    jc = _get(r, 'job_code', 'job', 'code', default='')
+    return str(jc or '')
+
+# ------------ Cache stati ------------
+STATUS_CACHE = defaultdict(dict)
+
+def normalize_status(value):
+    if not value:
+        return None
+    v = str(value).strip().lower()
+    mapping = {
+        'ok': 'ok', 'eligible': 'ok', 'idoneo': 'ok', 'assunto': 'ok',
+        'rejected': 'rejected', 'scartato': 'rejected', 'non idoneo': 'rejected',
+        'pending': 'pending', 'attesa': 'pending',
+        'contact': 'contact', 'da contattare': 'contact',
+    }
+    return mapping.get(v, v)
+
+def _resume_queryset_for_code(code):
+    # nel FE usiamo "code" = id JD in stringa
+    try:
+        jd = JD.objects.get(pk=int(code))
+    except Exception:
+        return JD.objects.none(), Resume.objects.none()
+
+    if not RESUME_FK_TO_JD:
+        return jd, Resume.objects.none()
+
+    return jd, Resume.objects.filter(**{f"{RESUME_FK_TO_JD}__pk": jd.pk})
+
+def compute_counts_for(code):
+    jd, qs = _resume_queryset_for_code(code)
+    if not jd:
+        return {"total": 0, "ok": 0, "rejected": 0, "pending": 0, "contact": 0}
+
+    total = qs.count()
+    counts = {"total": total, "ok": 0, "rejected": 0, "pending": 0, "contact": 0}
+    # conteggi solo da cache se non esiste campo status nel DB
+    for r in qs:
+        st = STATUS_CACHE.get(r.pk, {}).get("status") or normalize_status(_get(r, 'status', 'state'))
+        st = normalize_status(st) or 'pending'
+        if st in counts:
+            counts[st] += 1
+        else:
+            counts['pending'] += 1
+    return counts
+
+def _to_num(x):
+    try:
+        if x is None or x == '':
+            return None
+        return float(x)
+    except Exception:
+        try:
+            return float(Decimal(str(x)))
+        except Exception:
+            return None
+
+def _resume_to_row(request, r, job_code):
+    first = _get(r, 'first_name', 'name', default='').strip()
+    last  = _get(r, 'last_name', default='').strip()
+    email = _get(r, 'email', 'mail', default='')
+    phone = _get(r, 'phone', 'telefono', default='')
+    cache = STATUS_CACHE.get(r.pk, {})
+    status_db = normalize_status(_get(r, 'status', 'state'))
+    overall   = cache.get("status") or status_db or "pending"
+    score_title = _get(
+        r, 'titoli_di_studio_similarity',
+        'score_title', 'title_score', 'voto_titolo', 'voto_titoli', 'voto_titolo_studio'
+    )
+    score_skills = _get(
+        r, 'competenze_similarity',
+        'score_skills', 'skills_score', 'voto_competenze', 'voti_competenze', 'score_competenze'
+    )
+    score_experience = _get(
+        r, 'esperienze_similarity',
+        'score_experience', 'experience_score', 'voto_esperienze', 'voto_esperienza', 'score_esperienze'
+    )
+    score_similarity = _get(
+        r, 'score_similarity_avg', 'similarity_avg',
+        'media_voti', 'media_similarita', 'media_voti_similarita'
+    )
+    score_questions = _get(
+        r, 'domande_affinity',
+        'score_questions', 'questions_score', 'punteggio_domande'
+    )
+    score_avg = _get(
+        r, 'score_avg', 'final_score', 'total_score',
+        'media_tot', 'media_totale', 'media'
+    )
+    if score_similarity in (None, ''):
+        parts = [_to_num(score_title), _to_num(score_skills), _to_num(score_experience)]
+        parts = [p for p in parts if p is not None]
+        if parts:
+            score_similarity = sum(parts) / len(parts)
+    if score_avg in (None, ''):
+        ms = _to_num(score_similarity)
+        q  = _to_num(score_questions)
+        comps = [v for v in (ms, q) if v is not None]
+        if comps:
+            score_avg = sum(comps) / len(comps)
+    pdf_url     = request.build_absolute_uri(f"/view_pdf/{r.pk}/")
+    answers_url = request.build_absolute_uri(f"/risposte_domande/{r.pk}/")
+    return {
+        "id": r.pk,
+        "first_name": first,
+        "last_name": last,
+        "email": email,
+        "phone": phone,
+        "status": overall,
+        "status_cv":   cache.get("status_cv"),
+        "status_hr":   cache.get("status_hr"),
+        "status_tech": cache.get("status_tech"),
+        "job_code": str(job_code),
+        "score_title":          score_title,
+        "score_skills":         score_skills,
+        "score_experience":     score_experience,
+        "score_similarity_avg": score_similarity,
+        "score_questions":      score_questions,
+        "score_avg":            score_avg,
+
+        "pdf_url":     pdf_url,
+        "answers_url": answers_url,
+    }
+
+# ------------------------ Endpoints ------------------------
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def jobs(request):
+    if request.method == 'GET':
+        data = []
+        for jd in JD.objects.all().order_by('-id'):
+            code = str(jd.pk)
+            data.append({
+                "name": _get(jd, 'title', 'name', default=f"JD {jd.pk}"),
+                "content": _get(jd, 'description', 'content', default=''),
+                "deadline": _get(jd, 'deadline', 'scadenza', default=None),
+                "code": code,
+                "counts": compute_counts_for(code),
+            })
+        return Response(data)
+
+    # POST create
+    payload = request.data or {}
+    title = payload.get('name') or payload.get('title') or "Senza titolo"
+    description = payload.get('content') or payload.get('description') or ""
+    deadline = payload.get('deadline', None)
+
+    jd = JD()
+    _set(jd, 'title', title) or _set(jd, 'name', title)
+    _set(jd, 'description', description) or _set(jd, 'content', description)
+    _set(jd, 'deadline', deadline)
+    jd.save()
+
+    code = str(jd.pk)
+    return Response({
+        "name": title,
+        "content": description,
+        "deadline": deadline,
+        "code": code,
+        "counts": compute_counts_for(code),
+    }, status=http_status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def job_detail(request, code):
+    code = unquote(code)
+    try:
+        jd = JD.objects.get(pk=int(code))
+    except Exception:
+        return Response(status=http_status.HTTP_404_NOT_FOUND)
+
+    return Response({
+        "name": _get(jd, 'title', 'name', default=f"JD {jd.pk}"),
+        "content": _get(jd, 'description', 'content', default=''),
+        "deadline": _get(jd, 'deadline', 'scadenza', default=None),
+        "code": str(jd.pk),
+        "counts": compute_counts_for(str(jd.pk)),
+    })
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def candidates(request):
+    job = request.query_params.get('job', '')
+    job = unquote(job or '')
+    jd, qs = _resume_queryset_for_code(job)
+    rows = [_resume_to_row(request, r, job) for r in qs]
+    return Response(rows)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def candidates_by_job(request, code):
+    code = unquote(str(code or ''))
+    jd, qs = _resume_queryset_for_code(code)
+    rows = [_resume_to_row(request, r, code) for r in qs]
+    return Response(rows)
+
+@api_view(['PATCH'])
+@permission_classes([AllowAny])
+def candidate_update(request, pk):
+    try:
+        r = Resume.objects.get(pk=pk)
+    except Resume.DoesNotExist:
+        return Response(status=http_status.HTTP_404_NOT_FOUND)
+    payload = request.data or {}
+    st = normalize_status(payload.get('status'))
+    if st:
+        saved = False
+        if _set(r, 'status', st):
+            try:
+                r.save(update_fields=['status'])
+                saved = True
+            except Exception:
+                pass
+        if not saved and _set(r, 'state', st):
+            try:
+                r.save(update_fields=['state'])
+            except Exception:
+                try:
+                    r.save()
+                except Exception:
+                    pass
+        STATUS_CACHE[pk]['status'] = st
+    for k in ('email', 'phone'):
+        if k in payload and _set(r, k, payload[k]):
+            try:
+                r.save(update_fields=[k])
+            except Exception:
+                try:
+                    r.save()
+                except Exception:
+                    pass
+    job_code = _job_code_for_resume(r)
+    return Response(_resume_to_row(request, r, job_code))
+
+@api_view(['PATCH'])
+@permission_classes([AllowAny])
+def candidate_partial_update(request, pk):
+    # aggiorna solo cache per fasi
+    cache = STATUS_CACHE[pk]
+    for k in ('status_cv', 'status_hr', 'status_tech', 'status'):
+        if k in request.data:
+            val = request.data.get(k)
+            cache[k] = normalize_status(val) if k == 'status' else val
+    STATUS_CACHE[pk] = cache
+    return Response({"id": pk, **cache})
+
+User = get_user_model()
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@transaction.atomic
+def register(request):
+    """
+    Compatibile con la tua SPA:
+    body: { "email": ..., "password": ..., "username": (opzionale) }
+    """
+    raw_username = (request.data.get('username') or '').strip()
+    password     = (request.data.get('password') or '').strip()
+    email        = (request.data.get('email') or '').strip().lower()
+
+    if not email or not password:
+        return Response({'detail': 'username, email e password sono obbligatori'}, status=400)
+
+    # username auto-derivato se non fornito
+    if not raw_username:
+        base = (email.split('@')[0] or '').lower()
+        base = re.sub(r'[^a-z0-9_]', '_', base)[:30] or 'user'
+        candidate = base
+        i = 1
+        while User.objects.filter(username=candidate).exists():
+            suffix = f"_{i}"
+            candidate = (base[:max(1, 30 - len(suffix))]) + suffix
+            i += 1
+        username = candidate
+    else:
+        username = raw_username
+
+    if User.objects.filter(email__iexact=email).exists():
+        return Response({'detail': 'email già registrata'}, status=400)
+    if User.objects.filter(username=username).exists():
+        return Response({'detail': 'username già esistente'}, status=400)
+
+    user = User.objects.create_user(username=username, password=password, email=email)
+    token, _ = Token.objects.get_or_create(user=user)
+    return Response({'token': token.key, 'username': username}, status=201)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def login(request):
+    """
+    Compatibile con la tua SPA:
+    body: { "email": ..., "password": ... }  (oppure "username" al posto di email)
+    """
+    email    = (request.data.get('email') or '').strip().lower()
+    username = (request.data.get('username') or '').strip()
+    password = (request.data.get('password') or '').strip()
+
+    if email and not username:
+        try:
+            u = User.objects.get(email__iexact=email)
+            username = u.get_username()
+        except User.DoesNotExist:
+            return Response({'detail': 'credenziali non valide'}, status=400)
+
+    if not username or not password:
+        return Response({'detail': 'email/username e password richiesti'}, status=400)
+
+    user = authenticate(username=username, password=password)
+    if not user:
+        return Response({'detail': 'credenziali non valide'}, status=400)
+
+    token, _ = Token.objects.get_or_create(user=user)
+    return Response({'token': token.key})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout(request):
+    """
+    Invalida il token dell’utente corrente.
+    """
+    Token.objects.filter(user=request.user).delete()
+    return Response({'detail': 'logout ok'})

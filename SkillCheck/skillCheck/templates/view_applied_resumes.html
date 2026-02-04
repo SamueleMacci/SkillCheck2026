@@ -1,0 +1,158 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Curriculum per Job Description - SkillCheck</title>
+    <!-- Includi eventuali fogli di stile CSS o script JavaScript -->
+    <link rel="stylesheet" href="{% static 'styles/view_applied_resumes.css' %}" />
+  </head>
+  <body>
+    <header>
+      <a href="{% url 'job_description_details' job_description.id %}" class="skillcheck-link">SkillCheck</a>
+      <h1>Candidati dell'offerta di lavoro</h1>
+    </header>
+    <main>
+      <section>
+        <h2>{{ job_description.title }}</h2>
+        <p>{{ job_description.description }}</p>
+        <h3>Candidature:</h3>
+        <table id="resume-table">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Email</th>
+              <th>PDF</th>
+              <th>Questionario</th>
+              <th>
+                <a href="#" onclick="sortTable(4)">Voto Titoli di Studio &#8595;</a>
+              </th>
+              <th>
+                <a href="#" onclick="sortTable(5)">Voto Competenze &#8595;</a>
+              </th>
+              <th>
+                <a href="#" onclick="sortTable(6)">Voto Esperienze &#8595;</a>
+              </th>
+              <th>
+                <a href="#" onclick="sortTable(7)">Media Voti Similarità &#8595;</a>
+              </th>
+              <th>
+                <a href="#" onclick="sortTable(8)">Punteggio Domande &#8595;</a>
+              </th>
+              <th>
+                <a href="#" onclick="sortTable(9)">Media Totale &#8595;</a>
+              </th>
+              <th>GAP</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for resume in resumes %}
+              <tr>
+                <td>{{ resume.name }}</td>
+                <td>{{ resume.email }}</td>
+                <td>
+                  <a href="{% url 'view_pdf' resume.id %}" target="_blank">Visualizza PDF</a>
+                </td>
+                <td>
+                  <a href="{% url 'risposte_domande' resume.id %}">Visualizza Risposte</a>
+                </td>
+                <td>{{ resume.titoli_di_studio_similarity|floatformat:2 }}</td>
+                <td>{{ resume.competenze_similarity|floatformat:2 }}</td>
+                <td>{{ resume.esperienze_similarity|floatformat:2 }}</td>
+                <td>{{ resume.media_voti|floatformat:2 }}</td>
+                <td>{{ resume.domande_affinity|default:0 }}</td>
+                <td>{{ resume.media_tot|default:0 }}</td>
+                <td>
+                  {% with gs=resume.domande_e_risposte.gap_summary %}
+                    {% if gs %}
+                      <span class="badge">GAP: {{ gs.yes }}/{{ gs.total_yesno }} Sì</span>
+                    {% else %}
+                      <span class="badge">GAP: -</span>
+                    {% endif %}
+                  {% endwith %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="11">Nessun curriculum collegato a questa job description.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    </main>
+    <footer>
+      <!-- Footer del sito -->
+    </footer>
+
+    <script>
+      function sortTable(columnIndex) {
+        var table, rows, switching, i, x, y, shouldSwitch
+        table = document.getElementById('resume-table')
+        var highlightedColumnIndex = columnIndex - 1 // L'indice della colonna da evidenziare è uno in meno rispetto a columnIndex
+      
+        // Rimuove tutte le classi 'highlighted-column' dalle colonne della tabella
+        var thElements = table.getElementsByTagName('th')
+        for (var j = 0; j < thElements.length; j++) {
+          thElements[j].classList.remove('highlighted-column')
+        }
+      
+        // Aggiunge la classe 'highlighted-column' alla colonna selezionata
+        table.getElementsByTagName('th')[highlightedColumnIndex + 1].classList.add('highlighted-column')
+      
+        switching = true
+        while (switching) {
+          switching = false
+          rows = table.rows
+          for (i = 1; i < rows.length - 1; i++) {
+            shouldSwitch = false
+            x = rows[i].getElementsByTagName('td')[columnIndex]
+            y = rows[i + 1].getElementsByTagName('td')[columnIndex]
+            var xValue = parseFloat(x.innerHTML.trim() === 'None' ? '0' : x.innerHTML.trim())
+            var yValue = parseFloat(y.innerHTML.trim() === 'None' ? '0' : y.innerHTML.trim())
+            if (xValue < yValue) {
+              shouldSwitch = true
+              break
+            }
+          }
+          if (shouldSwitch) {
+            rows[i].parentNode.insertBefore(rows[i + 1], rows[i])
+            switching = true
+          }
+        }
+      }
+      
+      // Funzione per ordinare la tabella in base alla colonna "Media Totale" all'avvio della pagina
+      function sortTableByMediaTot() {
+        var table = document.getElementById('resume-table')
+        var columnIndex = 9 // Indice della colonna "Media Totale" (0-based index)
+      
+        // Ottenere tutte le righe tranne l'intestazione
+        var rows = Array.from(table.rows).slice(1)
+      
+        // Ordinare le righe in base al valore della colonna "Media Totale"
+        rows.sort(function (rowA, rowB) {
+          var cellA = parseFloat(rowA.cells[columnIndex].textContent.trim()) || 0
+          var cellB = parseFloat(rowB.cells[columnIndex].textContent.trim()) || 0
+          return cellB - cellA // Ordine decrescente
+        })
+      
+        // Aggiornare la tabella con le righe ordinate
+        for (var i = 0; i < rows.length; i++) {
+          table.appendChild(rows[i])
+        }
+      
+        // Aggiungi la classe 'highlighted-column' alla colonna "Media Totale" nell'intestazione
+        var thElements = table.getElementsByTagName('th')
+        for (var j = 0; j < thElements.length; j++) {
+          thElements[j].classList.remove('highlighted-column')
+        }
+        thElements[columnIndex].classList.add('highlighted-column')
+      }
+      
+      // Chiamare la funzione per ordinare la tabella all'avvio della pagina
+      document.addEventListener('DOMContentLoaded', sortTableByMediaTot)
+    </script>
+  </body>
+</html>

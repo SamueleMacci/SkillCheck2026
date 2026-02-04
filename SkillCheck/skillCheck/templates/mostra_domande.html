@@ -1,0 +1,87 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Mostra Domande</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="{% static 'styles/mostra_domande.css' %}" />
+  </head>
+  <body>
+    <h1>Domande Selezionate</h1>
+    <h2 class="section-title">Domande dalla Job Description</h2>
+    <form method="post" onsubmit="return validateForm()">
+      {% csrf_token %}
+      {% for domanda in domande_job_desc %}
+        <div class="question-container">
+          <p>
+            <span class="question-number">{{ forloop.counter }}.</span> {{ domanda }}
+          </p>
+          <label><input type="radio" name="domanda_job_desc_{{ forloop.counter }}" value="si" />Sì</label>
+          <label><input type="radio" name="domanda_job_desc_{{ forloop.counter }}" value="no" />No</label>
+        </div>
+      {% endfor %}
+
+      <h2 class="section-title">Domande Personali dal Resume</h2>
+      {% for domanda in domande_resume %}
+        <div class="question-container">
+          <p>
+            <span class="question-number">{{ forloop.counter|add:resume_start }}.</span> {{ domanda }}
+          </p>
+          <label><input type="radio" name="domanda_resume_{{ forloop.counter }}" value="si" />Sì</label>
+          <label><input type="radio" name="domanda_resume_{{ forloop.counter }}" value="no" />No</label>
+        </div>
+      {% endfor %}
+
+      {% if gap_questions %}
+        <h2 class="section-title">Domande sui GAP (AI)</h2>
+
+        {% for item in gap_questions %}
+          <div class="question-container">
+            <p>
+              <span class="question-number">{{ forloop.counter|add:resume_start|add:domande_job_desc|length }}</span>
+              {{ item.question }}
+              {% if item.skill %}
+                <span class="skill-hint">({{ item.skill }})</span>
+              {% endif %}
+            </p>
+
+            {% if item.type == 'yesno' %}
+              <label><input type="radio" name="gap_yesno_{{ forloop.counter0 }}" value="si" required />Sì</label>
+              <label><input type="radio" name="gap_yesno_{{ forloop.counter0 }}" value="no" required />No</label>
+            {% else %}
+              <input type="hidden" name="gap_short_skill_{{ forloop.counter0 }}" value="{{ item.skill|default_if_none:'' }}" />
+              <input type="text" name="gap_short_{{ forloop.counter0 }}" maxlength="120" placeholder="Risposta breve (max 120 caratteri)" />
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% endif %}
+
+      <input type="submit" value="Salva" class="submit-btn" />
+    </form>
+
+    <script>
+      function validateForm() {
+        const radioButtons = document.querySelectorAll('input[type="radio"]')
+        let isValid = true
+        let unansweredQuestion = ''
+      
+        radioButtons.forEach((radioButton) => {
+          const groupName = radioButton.getAttribute('name')
+          if (!isValid) return // Se non è valido, esci subito
+          if (!document.querySelector(`input[name="${groupName}"]:checked`)) {
+            const questionNumber = groupName.split('_')[3]
+            unansweredQuestion = questionNumber
+            isValid = false
+          }
+        })
+      
+        if (!isValid) {
+          alert(`Per favore, rispondi alla domanda numero ${unansweredQuestion}`)
+        }
+      
+        return isValid
+      }
+    </script>
+  </body>
+</html>

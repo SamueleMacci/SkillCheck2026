@@ -1,0 +1,113 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seleziona Domande per Job Description</title>
+    <link rel="stylesheet" href="{% static 'styles/select_questions.css' %}">
+</head>
+<body>
+    <h1>Seleziona 7 Domande da porre al candidato</h1>
+
+    <form method="post" action="{% url 'save_selected_questions' pk=job_description.pk %}">
+        {% csrf_token %}
+
+        <h2>Esperienze</h2>
+        <div class="question-container">
+            <!-- Lista delle domande esistenti -->
+            {% for question in esperienze_questions %}
+                <input type="checkbox" name="selected_esperienze" value="{{ question }}">
+                <label>{{ question }}</label><br>
+            {% endfor %}
+        </div>
+
+        <div class="new-question-container">
+            <!-- Campo di testo per la nuova domanda -->
+            <input type="text" class="new-question-input" name="new_questions[esperienze][]" placeholder="Nuova Domanda...">
+            <!-- Aggiungi il pulsante "Aggiungi Domanda" per Esperienze -->
+            <button type="button" class="add-question-btn" data-category="esperienze">Aggiungi Domanda</button>
+        </div>
+
+        <h2>Competenze</h2>
+        <div class="question-container">
+            <!-- Lista delle domande esistenti -->
+            {% for question in competenze_questions %}
+                <input type="checkbox" name="selected_competenze" value="{{ question }}">
+                <label>{{ question }}</label><br>
+            {% endfor %}
+        </div>
+
+        <div class="new-question-container">
+            <!-- Campo di testo per la nuova domanda -->
+            <input type="text" class="new-question-input" name="new_questions[competenze][]" placeholder="Nuova Domanda...">
+            <!-- Aggiungi il pulsante "Aggiungi Domanda" per Competenze -->
+            <button type="button" class="add-question-btn" data-category="competenze">Aggiungi Domanda</button>
+        </div>
+
+        <h2>Titoli di Studio</h2>
+        <div class="question-container">
+            <!-- Lista delle domande esistenti -->
+            {% for question in titoli_di_studio_questions %}
+                <input type="checkbox" name="selected_titoli_di_studio" value="{{ question }}">
+                <label>{{ question }}</label><br>
+            {% endfor %}
+        </div>
+
+        <div class="new-question-container">
+            <!-- Campo di testo per la nuova domanda -->
+            <input type="text" class="new-question-input" name="new_questions[titoli_di_studio][]" placeholder="Nuova Domanda...">
+            <!-- Aggiungi il pulsante "Aggiungi Domanda" per Titoli di Studio -->
+            <button type="button" class="add-question-btn" data-category="titoli_di_studio">Aggiungi Domanda</button>
+        </div>
+
+        <button type="submit">Salva</button>
+    </form>
+
+    <!-- Script JavaScript per gestire l'aggiunta di nuove domande -->
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        let questionCounter = 0;
+
+        document.querySelectorAll('.add-question-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const category = this.dataset.category;
+                const questionContainer = this.parentNode.querySelector('.new-question-input');
+                const newQuestionId = `question_${++questionCounter}`;
+
+                const newQuestionInput = document.createElement('input');
+                newQuestionInput.setAttribute('type', 'checkbox');
+                newQuestionInput.setAttribute('name', `new_questions[${category}][][text]`);
+                newQuestionInput.setAttribute('value', questionContainer.value); // Impostiamo il testo della domanda come valore della checkbox
+                newQuestionInput.setAttribute('id', newQuestionId);
+                newQuestionInput.classList.add('custom-checkbox'); // Aggiungi la classe alla nuova checkbox
+
+                const newQuestionLabel = document.createElement('label');
+                newQuestionLabel.textContent = questionContainer.value;
+                newQuestionLabel.setAttribute('for', newQuestionId);
+
+                questionContainer.parentNode.insertBefore(newQuestionInput, questionContainer);
+                questionContainer.parentNode.insertBefore(newQuestionLabel, questionContainer);
+                questionContainer.parentNode.insertBefore(document.createElement('br'), questionContainer);
+            });
+        });
+    });
+
+ document.addEventListener("DOMContentLoaded", function() {
+    const maxSelections = 7;
+
+    document.querySelectorAll('form input[type="checkbox"]').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const form = this.closest('form');
+            const selectedCheckboxes = form.querySelectorAll('input[type="checkbox"]:checked');
+
+            if (selectedCheckboxes.length > maxSelections) {
+                this.checked = false;
+                alert(`Puoi selezionare al massimo ${maxSelections} domande.`);
+            }
+        });
+    });
+});
+    </script>
+</body>
+</html>

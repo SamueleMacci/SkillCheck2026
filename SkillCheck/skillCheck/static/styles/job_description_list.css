@@ -1,0 +1,86 @@
+/* Stile per l'header */
+header {
+    background: linear-gradient(to right, #9ddcb0, #ffffff); /* Utilizzo di un gradient verde */
+    padding: 10px 20px; /* Aggiunto spazio interno sopra e sotto */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 9999;
+}
+
+/* Stile per il contenuto dell'header */
+.header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* Allinea gli elementi orizzontalmente */
+}
+
+/* Stile per il titolo "SkillCheck" */
+.site-title {
+    color: #00a200;
+    text-decoration: none;
+    font-size: 48px;
+    margin: 0;
+    font-family: 'Arial', sans-serif; /* Specifica il font desiderato */
+}
+
+/* Effetto di transizione sul bottone */
+.yellow-btn {
+    background-color: #ffcc00;
+    border-radius: 10px;
+    padding: 10px 20px;
+    text-decoration: none;
+    color: #000;
+    font-size: 18px;
+    margin-left: auto;
+    margin-right: 30px;
+    transition: background-color 0.3s ease; /* Aggiungi un'effetto di transizione */
+}
+
+/* Cambia colore del testo del bottone al passaggio del mouse */
+.yellow-btn:hover {
+    background-color: #ffd633;
+    color: #333;
+}
+
+/* Stile per la lista delle offerte di lavoro */
+section {
+    width: 80%;
+    margin: 70px auto 20px auto; /* Modificato il margine superiore per far spazio al titolo e al bottone */
+    padding-top: 20px; /* Aggiunto padding sopra per far spazio all'header */
+}
+
+
+
+/* Stile del link alle offerte di lavoro */
+.job-title {
+    color: #00a200;
+    text-decoration: none;
+    font-size: 24px;
+    display: block;
+    margin-bottom: 10px;
+    transition: color 0.3s ease; /* Aggiungi un'effetto di transizione */
+}
+
+/* Cambia colore del testo del link al passaggio del mouse */
+.job-title:hover {
+    color: #007700;
+}
+
+/* Stile per ogni elemento della lista delle offerte di lavoro */
+.job-item {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background-color: #f9f9f9; /* Sfondo grigio chiaro */
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Aggiunge ombra al riquadro */
+}
+
+/* Stile per la descrizione delle offerte di lavoro */
+.job-description {
+    margin-top: 10px; /* Aggiunge spazio sopra la descrizione */
+    font-size: 16px;
+    color: #333; /* Colore del testo scuro */
+}
