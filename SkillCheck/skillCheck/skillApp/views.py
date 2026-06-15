@@ -10,6 +10,9 @@ from .models import JobDescription
 from django.http import HttpResponseRedirect
 from .utils import build_jd_cv_matrix, extract_skill_gaps, generate_gap_questions_t5
 import re, unicodedata
+import random
+from django.conf import settings
+from .models import PersonalityQuestion
 
 
 def index(request):
@@ -276,7 +279,7 @@ def mostra_domande(request, resume_id, job_description_id):
         resume.domande_e_risposte = base
         resume.save_affinity()
 
-        return redirect("job_description_list")
+        return redirect("personality_test", resume_id=resume.id)
 
     # -------------------- GET: genera domande GAP e mostra pagina --------------------
     jd_skills_raw = [str(s) for s in domande_job_desc]
@@ -562,3 +565,35 @@ def view_pdf(request, resume_id):
     base64_pdf = base64.b64encode(pdf_data).decode("utf-8")
 
     return render(request, "view_pdf.html", {"base64_pdf": base64_pdf})
+
+def personality_test(request, resume_id):
+    resume = get_object_or_404(Resume, pk=resume_id)
+    
+    if request.method == "GET":
+        # 1. MODIFICA CHIAVE: Niente più 'list()' e niente più 'random.shuffle()'.
+        # Chiediamo direttamente al database di darci le domande in ordine di ID.
+        domande = PersonalityQuestion.objects.all().order_by('id')
+        
+        return render(request, 'personality_test.html', {'domande': domande, 'resume': resume})
+    
+    elif request.method == "POST":
+        risposte = {}
+        
+        # 2. LOGICA POST: Raccoglie i valori (domanda_1, domanda_2...) e li mette nel dizionario
+        for i in range(1, 51):
+            campo_form = f"domanda_{i}"
+            if campo_form in request.POST:
+                risposte[str(i)] = int(request.POST.get(campo_form))
+        
+        # 3. SALVATAGGIO: Qui entra in gioco la magia del campo che abbiamo appena creato!
+        # Django prenderà questo dizionario 'risposte', lo trasformerà in testo
+        # e la libreria cryptography lo salverà in formato binario illeggibile nel database.
+        resume.risposte_personalita_raw = risposte
+        resume.save()
+        
+        # Renderizza direttamente il messaggio di completamento
+        context = {
+            'resume': resume,
+            'message': 'Grazie per aver completato il test di personalità! Le tue risposte sono state salvate in modo sicuro.'
+        }
+        return render(request, 'personality_test_complete.html', context)

@@ -23,7 +23,7 @@ from django.views.generic import TemplateView
 from skillApp.views import (
     index, job_description_list, create_job_description, job_description_details,
     apply_for_job, view_applied_resumes, select_questions_for_job_description,
-    save_selected_questions, mostra_domande, mostra_risposte, view_pdf
+    save_selected_questions, mostra_domande, mostra_risposte, view_pdf,personality_test
 )
 
 urlpatterns = [
@@ -38,6 +38,7 @@ urlpatterns = [
          name='select_questions_for_job_description'),
     path('<int:pk>/save_selected_questions/', save_selected_questions, name='save_selected_questions'),
     path('mostra_domande/<int:resume_id>/<int:job_description_id>/', mostra_domande, name='mostra_domande'),
+    path('personality_test/<int:resume_id>/', personality_test, name='personality_test'),
     path('risposte_domande/<int:resume_id>/', mostra_risposte, name='risposte_domande'),
     path('view_pdf/<int:resume_id>/', view_pdf, name='view_pdf'),
     path('api/', include('skillApp.api_bridge_urls')),

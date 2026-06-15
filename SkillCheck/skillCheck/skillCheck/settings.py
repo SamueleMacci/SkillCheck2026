@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'skillApp',
     'rest_framework',
     'rest_framework.authtoken',
+    'django_cryptography',
 ]
 
 MIDDLEWARE = [

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8" />
+    <title>Test completato</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 24px; }
+        .card { padding: 24px; border: 1px solid #ddd; border-radius: 8px; max-width: 700px; }
+        a { color: #0a6efd; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Grazie!</h1>
+        <p>{{ message }}</p>
+        <p>Le tue risposte sono state salvate correttamente.</p>
+        <p><a href="{% url 'job_description_list' %}">Torna alla lista delle offerte</a></p>
+    </div>
+</body>
+</html>

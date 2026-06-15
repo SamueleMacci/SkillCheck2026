@@ -2,7 +2,12 @@
 from django.db import models
 from .utils import compute_satisfaction_percentage, extract_entities_from_text, \
     generate_questions, extract_text_from_pdf_content, filter_new_questions, extract_entities_resume
+from django_cryptography.fields import encrypt
 
+class PersonalityQuestion(models.Model):
+    testo = models.TextField()
+    tratto = models.CharField(max_length=1)  # E, A, C, O, N
+    direzione = models.CharField(max_length=1)  # + o -  
 
 class JobDescription(models.Model):
     title = models.CharField(max_length=255)
@@ -58,7 +63,7 @@ class Resume(models.Model):
     domande_personali = models.TextField(blank=True)
     domande_affinity = models.FloatField(null=True, blank=True)
     domande_e_risposte = models.JSONField(default=dict)  # Campo per memorizzare domande e risposte come dizionario JSON
-
+    risposte_personalita_raw = encrypt(models.JSONField(null=True, blank=True))
     job_description = models.ForeignKey(JobDescription, on_delete=models.CASCADE, default=1)
     resume_text = models.TextField(blank=True)
     pdf_file_upload = models.FileField(upload_to='pdf_resumes/', null=True, blank=True)
