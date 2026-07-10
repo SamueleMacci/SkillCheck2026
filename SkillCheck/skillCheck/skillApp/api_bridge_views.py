@@ -1,22 +1,32 @@
+# --- LIBRERIE STANDARD PYTHON ---
+import re
 from urllib.parse import unquote
 from collections import defaultdict
+from decimal import Decimal
 
+# --- LIBRERIE DJANGO ---
 from django.apps import apps
 from django.db.models import Q
 from django.utils.timezone import now
+from django.contrib.auth import authenticate, get_user_model
+from django.db import transaction
+from django.core.files.storage import Storage
+from django.http import HttpRequest
+from django.core.mail import send_mail  
 
+# --- LIBRERIE REST FRAMEWORK ---
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status as http_status
-from django.contrib.auth import authenticate, get_user_model
-from django.db import transaction
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
-import re
-from django.core.files.storage import Storage
-from django.http import HttpRequest
-from decimal import Decimal
 
+# --- IMPORT LOCALI ---
+from .models import EmailTemplate, PersonalityCounter  # <--- models for mail
+from .personality_engine.calcolo_personalita import calcola_personalita  
+from .utils import genera_consiglio_ia# <--- local ai
+
+from .utils import hash_personality
 # ------------ Model access (robusto a differenze di nomi) ------------
 JD = apps.get_model('skillApp', 'JobDescription')
 # Prova a risolvere il modello dei candidati/applied resumes
@@ -300,8 +310,10 @@ def candidate_update(request, pk):
         r = Resume.objects.get(pk=pk)
     except Resume.DoesNotExist:
         return Response(status=http_status.HTTP_404_NOT_FOUND)
+    
     payload = request.data or {}
     st = normalize_status(payload.get('status'))
+    
     if st:
         saved = False
         if _set(r, 'status', st):
@@ -319,6 +331,102 @@ def candidate_update(request, pk):
                 except Exception:
                     pass
         STATUS_CACHE[pk]['status'] = st
+
+        # ---  IN CASE PERSON WENT REJECTED ---
+        if st == 'rejected':
+            if hasattr(r, 'risposte_personalita_raw') and r.risposte_personalita_raw:
+                
+                # 1.  find skill gaps and generate advice with AI
+                gaps = getattr(r, 'domande_e_risposte', {}).get("skill_gaps", []) if hasattr(r, 'domande_e_risposte') and isinstance(getattr(r, 'domande_e_risposte'), dict) else []
+                gap_skills = [g.get("jd_skill") for g in gaps if isinstance(g, dict) and g.get("jd_skill")]
+                skills_str = ", ".join(gap_skills) if gap_skills else ""
+                
+               # print(f"Richiesta frase all'IA per le skill: {skills_str}")
+                commento_ia = genera_consiglio_ia(skills_str)
+                #print(f"Risposta IA: {commento_ia}")
+
+                # 2. Calculate personality profile from raw answers 
+                risposte = r.risposte_personalita_raw
+                profilo_completo, _ = calcola_personalita(risposte)
+                profilo_base = profilo_completo[:4]
+               
+                
+                # Check all MAIUSC letters and strip whitespace
+                profilo_base = str(profilo_completo[:4]).strip().upper()
+                
+                #print(f"Sto cercando nel database il template per la personalità: '{profilo_base}'")
+                
+                # 3. base date for compilation 
+                jd_title = 'la posizione'
+                if RESUME_FK_TO_JD and hasattr(r, RESUME_FK_TO_JD):
+                    rel = getattr(r, RESUME_FK_TO_JD)
+                    if rel:
+                        if hasattr(rel, 'title'):
+                            jd_title = rel.title
+                        elif hasattr(rel, 'first') and rel.first():
+                            jd_title = rel.first().title
+
+                dati_frontend = _resume_to_row(request, r, _job_code_for_resume(r))
+                score_avg = dati_frontend.get("score_avg")
+                
+                # *10 is a %
+                percentuale = int(float(score_avg) * 10) if score_avg else 0
+                nome_candidato = _get(r, 'first_name', 'name', default='Candidato').strip()
+                email_destinatario = _get(r, 'email', 'mail')
+
+                # 4. Rotation email 1->10 for each personality type
+                profilo_hash = hash_personality(profilo_base)
+                counter, _ = PersonalityCounter.objects.get_or_create(personality_type=profilo_hash)
+                next_sequence = (counter.last_used_sequence % 10) + 1
+                
+                try:
+                    template = EmailTemplate.objects.get(personality_type=profilo_base, sequence_number=next_sequence)
+                    email_finale = template.body_text
+                    
+                    lignes = email_finale.split('\n')
+                    subject = "Aggiornamento sulla tua candidatura"
+                    if "Oggetto:" in lignes[0]:
+                        subject = lignes[0].replace("Oggetto:", "").replace("**", "").strip()
+                        email_finale = '\n'.join(lignes[1:]).strip()
+                        
+                except EmailTemplate.DoesNotExist:
+                    email_finale = "Gentile [Nome del Candidato], grazie per aver presentato la tua candidatura. [commento] Cordiali saluti, Il Team HR."
+                    subject = "Esito della tua candidatura"
+
+                # 5. COMPILE MAIL 
+                email_finale = email_finale.replace("[Nome del Candidato]", nome_candidato)
+                email_finale = email_finale.replace("[Posizione]", jd_title)
+                email_finale = email_finale.replace("[Azienda]", "SkillCheck")
+                email_finale = email_finale.replace("[C]%", f"{percentuale}%")
+                email_finale = email_finale.replace("[commento]", commento_ia) 
+                subject = subject.replace("[Posizione]", jd_title).replace("[Azienda]", "SkillCheck")
+
+                # 6. send email to candidate
+                if email_destinatario:
+                    try:
+                        send_mail(
+                            subject=subject,
+                            message=email_finale,
+                            from_email='recruiting@tuosito.com', # insert here your real email address
+                            recipient_list=[email_destinatario],
+                            fail_silently=False, 
+                        )
+                        #print(f"Email inviata con successo a {email_destinatario} (Template {next_sequence} per {profilo_base})")
+                        
+                        # save counter if the email is sent successfully
+                        counter.last_used_sequence = next_sequence
+                        counter.save()
+                    except Exception as e:
+                        print(f"Errore invio email: {e}")
+
+                # 7. DELETE PERSONALITY DATA
+                try:
+                    r.risposte_personalita_raw = None
+                    r.save(update_fields=['risposte_personalita_raw'])
+                except Exception:
+                    pass
+        # --- END AI BLOCK---
+
     for k in ('email', 'phone'):
         if k in payload and _set(r, k, payload[k]):
             try:
@@ -328,6 +436,7 @@ def candidate_update(request, pk):
                     r.save()
                 except Exception:
                     pass
+                    
     job_code = _job_code_for_resume(r)
     return Response(_resume_to_row(request, r, job_code))
 

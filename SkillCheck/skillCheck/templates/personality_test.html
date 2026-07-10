@@ -13,7 +13,7 @@
 </head>
 <body>
     <h1>Test della personalità</h1>
-    <p>Rispondi a tutte le domande scegliendo un valore da 1 a 7.</p>
+    <p>Rispondi a tutte le domande.</p>
 
     <form method="post" action="{% url 'personality_test' resume.id %}">
         {% csrf_token %}
@@ -21,14 +21,29 @@
         {% for domanda in domande %}
             <div class="question-block">
                 <p><strong>{{ forloop.counter }}.</strong> {{ domanda.testo }}</p>
+                
                 <div class="radio-group">
-                    <label><input type="radio" name="domanda_{{ forloop.counter }}" value="1" required /> 1</label>
-                    <label><input type="radio" name="domanda_{{ forloop.counter }}" value="2" required /> 2</label>
-                    <label><input type="radio" name="domanda_{{ forloop.counter }}" value="3" required /> 3</label>
-                    <label><input type="radio" name="domanda_{{ forloop.counter }}" value="4" required /> 4</label>
-                    <label><input type="radio" name="domanda_{{ forloop.counter }}" value="5" required /> 5</label>
-                    <label><input type="radio" name="domanda_{{ forloop.counter }}" value="6" required /> 6</label>
-                    <label><input type="radio" name="domanda_{{ forloop.counter }}" value="7" required /> 7</label>
+                    <label style="display: block; margin-bottom: 8px; cursor: pointer;">
+                        <input type="radio" name="domanda_{{ forloop.counter }}" value="1" required /> Del tutto in disaccordo
+                    </label>
+                    <label style="display: block; margin-bottom: 8px; cursor: pointer;">
+                        <input type="radio" name="domanda_{{ forloop.counter }}" value="2" required /> In disaccordo
+                    </label>
+                    <label style="display: block; margin-bottom: 8px; cursor: pointer;">
+                        <input type="radio" name="domanda_{{ forloop.counter }}" value="3" required /> Leggermente in disaccordo
+                    </label>
+                    <label style="display: block; margin-bottom: 8px; cursor: pointer;">
+                        <input type="radio" name="domanda_{{ forloop.counter }}" value="4" required /> Neutro
+                    </label>
+                    <label style="display: block; margin-bottom: 8px; cursor: pointer;">
+                        <input type="radio" name="domanda_{{ forloop.counter }}" value="5" required /> Leggermente d'accordo
+                    </label>
+                    <label style="display: block; margin-bottom: 8px; cursor: pointer;">
+                        <input type="radio" name="domanda_{{ forloop.counter }}" value="6" required /> D'accordo
+                    </label>
+                    <label style="display: block; margin-bottom: 8px; cursor: pointer;">
+                        <input type="radio" name="domanda_{{ forloop.counter }}" value="7" required /> Del tutto d'accordo
+                    </label>
                 </div>
             </div>
         {% empty %}
@@ -37,5 +52,5 @@
 
         <button type="submit">Invia risposte</button>
     </form>
-</body>
+
 </html>

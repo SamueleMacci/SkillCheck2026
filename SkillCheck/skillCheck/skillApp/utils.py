@@ -1,9 +1,13 @@
+import os
+import hmac
+import hashlib
 from io import BytesIO
 from functools import lru_cache
 from pathlib import Path
 from typing import List, Dict, Any, Callable
 from django.conf import settings
 from pdfminer.high_level import extract_text
+from transformers import pipeline
 
 # -------------------------
 # Helpers per i modelli NLP
@@ -538,3 +542,40 @@ def generate_gap_questions_t5(
             )
 
     return out
+
+# use local ai model
+modello_path = os.path.join("modelli", "qwen_hr")
+
+try:
+    print("Caricamento del modello IA locale in corso (potrebbe impiegare qualche secondo)...")
+    generatore_hr = pipeline(
+        "text-generation",
+        model=modello_path, 
+        device="cpu" 
+    )
+    print("Modello IA caricato e pronto all'uso!")
+except Exception as e:
+    print(f"Errore caricamento IA: {e}")
+    generatore_hr = None
+
+def genera_consiglio_ia(skills_mancanti):
+    if not skills_mancanti or not generatore_hr:
+        return "Ti invitiamo comunque a continuare a perfezionare le tue competenze per le sfide future."
+
+    messaggi = [
+        {"role": "system", "content": "Sei un recruiter professionale. Scrivi una sola frase cortese e diretta (massimo 20 parole) per consigliare a un candidato di studiare le competenze che gli mancano."},
+        {"role": "user", "content": f"Le competenze da consigliare sono: {skills_mancanti}. Scrivi solo la frase finale."}
+    ]
+
+    risultato = generatore_hr(messaggi, max_new_tokens=70, temperature=0.3, do_sample=True)
+    return risultato[0]['generated_text'][-1]['content'].strip()
+
+def hash_personality(personality_str: str) -> str:
+    """Transform the personality type (e.g. 'INTJ?) into an hash HMAC_SHA256 deterministic 
+    and not reversible without the key PERSONALITY_HASH_PEPPER."""
+    normalized = (personality_str or '').strip().upper()
+    return hmac.new(
+        settings.PERSONALITY_HASH_PEPPER.encode('utf-8'),
+        normalized.encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest()

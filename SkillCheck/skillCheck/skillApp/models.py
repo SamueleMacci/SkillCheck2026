@@ -110,3 +110,21 @@ class Resume(models.Model):
     def _update_fields(self, fields):
         # Salva solo i campi specificati senza chiamare il metodo save predefinito
         self.__class__.objects.filter(pk=self.pk).update(**{field: getattr(self, field) for field in fields})
+        
+class PersonalityCounter(models.Model):
+    personality_type = models.CharField(max_length=64, unique=True)
+    last_used_sequence = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"Hash {self.personality_type[:8]} - Ultimo: {self.last_used_sequence}"
+
+class EmailTemplate(models.Model):
+    personality_type = models.CharField(max_length=10)
+    sequence_number = models.IntegerField()
+    body_text = models.TextField()
+
+    class Meta:
+        unique_together = ('personality_type', 'sequence_number')
+
+    def __str__(self):
+        return f"Template {self.sequence_number} per {self.personality_type}"

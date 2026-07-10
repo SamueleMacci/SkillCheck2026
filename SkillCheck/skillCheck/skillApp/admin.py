@@ -1,6 +1,6 @@
 # admin.py
 from django.contrib import admin
-from .models import JobDescription, Resume
+from .models import JobDescription, Resume, PersonalityCounter, EmailTemplate
 from .forms import JobDescriptionAdminForm, ResumeForm
 
 @admin.register(JobDescription)
@@ -59,3 +59,6 @@ class ResumeAdmin(admin.ModelAdmin):
         return obj.titoli_di_studio[:30] if obj.titoli_di_studio else ''
 
     titoli_di_studio_short.short_description = 'Titoli di studio'
+    
+admin.site.register(PersonalityCounter)
+admin.site.register(EmailTemplate)
