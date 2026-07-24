@@ -468,6 +468,18 @@ REST_FRAMEWORK = {
 COMPARATOR_GAP_THRESHOLD = 8.0   # sotto 6/10 -> gap
 COMPARATOR_TOP_K_GAPS    = 3     # quante skill JD sotto soglia tenere
 
-# --- email di test backend ---
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# --- email  test backend ---
+#EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# real mail 
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+#site mail, not recruiter mail
+EMAIL_HOST_USER = 'avvisi.skillcheck@gmail.com' #recruiterCheck2026
+
+
+# password generated from google account security settings, not the real password of the email
+EMAIL_HOST_PASSWORD = 'worsnluwcuxotnxf'
 

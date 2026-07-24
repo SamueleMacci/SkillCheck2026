@@ -12,7 +12,8 @@ from django.contrib.auth import authenticate, get_user_model
 from django.db import transaction
 from django.core.files.storage import Storage
 from django.http import HttpRequest
-from django.core.mail import send_mail  
+#from django.core.mail import send_mail beckend mail import
+from django.core.mail import EmailMessage
 
 # --- LIBRERIE REST FRAMEWORK ---
 from rest_framework.decorators import api_view, permission_classes
@@ -337,13 +338,24 @@ def candidate_update(request, pk):
             if hasattr(r, 'risposte_personalita_raw') and r.risposte_personalita_raw:
                 
                 # 1.  find skill gaps and generate advice with AI
-                gaps = getattr(r, 'domande_e_risposte', {}).get("skill_gaps", []) if hasattr(r, 'domande_e_risposte') and isinstance(getattr(r, 'domande_e_risposte'), dict) else []
-                gap_skills = [g.get("jd_skill") for g in gaps if isinstance(g, dict) and g.get("jd_skill")]
-                skills_str = ", ".join(gap_skills) if gap_skills else ""
+                #gaps = getattr(r, 'domande_e_risposte', {}).get("skill_gaps", []) if hasattr(r, 'domande_e_risposte') and isinstance(getattr(r, 'domande_e_risposte'), dict) else []
+                #gap_skills = [g.get("jd_skill") for g in gaps if isinstance(g, dict) and g.get("jd_skill")]
+                #skills_str = ", ".join(gap_skills) if gap_skills else ""
                 
                # print(f"Richiesta frase all'IA per le skill: {skills_str}")
-                commento_ia = genera_consiglio_ia(skills_str)
+                #commento_ia = genera_consiglio_ia(skills_str)
                 #print(f"Risposta IA: {commento_ia}")
+                #NEW FIND SKILL GAPS 
+                domande_risposte = getattr(r,'domande_e_risposte', {})
+                gap_skills = []
+                if isinstance(domande_risposte, dict):
+                    for chiave, valore in domande_risposte.items():
+                        if isinstance(valore, str) and valore.strip().lower()== "no":
+                            skill_pulita =  chiave.replace("?","").strip()
+                            gap_skills.append(skill_pulita)
+                skills_str = ", ".join(gap_skills) if gap_skills else ""
+                commento_ia = genera_consiglio_ia(skills_str)
+                        
 
                 # 2. Calculate personality profile from raw answers 
                 risposte = r.risposte_personalita_raw
@@ -400,20 +412,40 @@ def candidate_update(request, pk):
                 email_finale = email_finale.replace("[C]%", f"{percentuale}%")
                 email_finale = email_finale.replace("[commento]", commento_ia) 
                 subject = subject.replace("[Posizione]", jd_title).replace("[Azienda]", "SkillCheck")
-
                 # 6. send email to candidate
-                if email_destinatario:
-                    try:
-                        send_mail(
-                            subject=subject,
-                            message=email_finale,
-                            from_email='recruiting@tuosito.com', # insert here your real email address
-                            recipient_list=[email_destinatario],
-                            fail_silently=False, 
-                        )
+                # email_destinatario:
+                    #try:
+                        #send_mail(
+                            #subject=subject,
+                            #message=email_finale,
+                            #from_email='recruiting@tuosito.com', # insert here your real email address
+                            #recipient_list=[email_destinatario],
+                            #fail_silently=False, 
+                        #) beckend mail block
                         #print(f"Email inviata con successo a {email_destinatario} (Template {next_sequence} per {profilo_base})")
                         
                         # save counter if the email is sent successfully
+                if email_destinatario:
+                    try:
+                        # Recupera l'email del recruiter se è loggato
+                        recruiter_email = None
+                        if request.user and request.user.is_authenticated:
+                            recruiter_email = request.user.email
+                        # Imposta a chi deve andare la risposta (Reply-To)
+                        reply_to_list = [recruiter_email] if recruiter_email else []
+
+                        # Crea l'oggetto EmailMessage
+                        email_msg = EmailMessage(
+                            subject=subject,
+                            body=email_finale,
+                            from_email='avvisi.skillcheck@gmail.com',  # <-- site/server mail address
+                            to=[email_destinatario],
+                            reply_to=reply_to_list                # <-- will be recruiter mail address
+                        )
+                                    
+                        # Invia l'email
+                        email_msg.send(fail_silently=False)        
+                        
                         counter.last_used_sequence = next_sequence
                         counter.save()
                     except Exception as e:
@@ -426,7 +458,49 @@ def candidate_update(request, pk):
                 except Exception:
                     pass
         # --- END AI BLOCK---
+        
+        #--IN CASE OF REJECTED CANDIDATE WITHOUT PERSONALITY DATA, SEND A GENERIC EMAIL WITH AI COMMENT--    
+            else:
+                
+                # 1. SKILL GAPS
+                domande_risposte = getattr(r, 'domande_e_risposte', {})
+                gap_skills = []
+                if isinstance(domande_risposte, dict):
+                    for chiave, valore in domande_risposte.items():
+                        if isinstance(valore, str) and valore.strip().lower() == "no":
+                            skill_pulita = chiave.replace("?", "").strip()
+                            gap_skills.append(skill_pulita)
+                            
+                skills_str = ", ".join(gap_skills) if gap_skills else ""
+                commento_ia = genera_consiglio_ia(skills_str)
 
+                # 2. BASE DATA FOR EMAIL
+                nome_candidato = _get(r, 'first_name', 'name', default='Candidato').strip()
+                email_destinatario = _get(r, 'email', 'mail')
+                
+                # 3. GENERIC EMAIL TEMPLATE
+                subject = "Aggiornamento esito candidatura"
+                email_finale = f"Gentile {nome_candidato},\n\nTi confermiamo che in questa fase abbiamo deciso di non procedere con la tua candidatura. {commento_ia}\n\nTi auguriamo il meglio per le tue future opportunità professionali.\n\nCordiali saluti,\nIl Team HR."
+
+                # 4. SEND EMAIL
+                if email_destinatario:
+                    try:
+                        recruiter_email = None
+                        if request.user and request.user.is_authenticated:
+                            recruiter_email = request.user.email
+                        reply_to_list = [recruiter_email] if recruiter_email else []
+
+                        email_msg = EmailMessage(
+                            subject=subject,
+                            body=email_finale,
+                            from_email='avvisi.skillcheck@gmail.com',
+                            to=[email_destinatario],
+                            reply_to=reply_to_list
+                        )
+                        email_msg.send(fail_silently=False)
+                    except Exception as e:
+                        print(f"Errore invio email di fallback: {e}")
+                        
     for k in ('email', 'phone'):
         if k in payload and _set(r, k, payload[k]):
             try:
