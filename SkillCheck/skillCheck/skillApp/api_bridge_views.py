@@ -226,6 +226,8 @@ def _resume_to_row(request, r, job_code):
         "score_questions":      score_questions,
         "score_avg":            score_avg,
 
+        "comment": _get(r, 'comment', default=''),
+
         "pdf_url":     pdf_url,
         "answers_url": answers_url,
     }
@@ -501,7 +503,7 @@ def candidate_update(request, pk):
                     except Exception as e:
                         print(f"Errore invio email di fallback: {e}")
                         
-    for k in ('email', 'phone'):
+    for k in ('email', 'phone', 'comment'):
         if k in payload and _set(r, k, payload[k]):
             try:
                 r.save(update_fields=[k])

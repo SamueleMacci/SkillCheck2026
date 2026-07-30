@@ -9,8 +9,14 @@
       </p>
 
       <div class="contenitoreButton">
-        <button class="btnRegister-btn" @click="goToRegister">Registrati</button>
-        <button class="btnLogin-btn" @click="goToLogin">Login</button>
+        <template v-if="isAuth">
+          <button class="btnRegister-btn" @click="goToDashboard">Dashboard</button>
+          <button class="btnLogin-btn" @click="goLogout">Logout</button>
+        </template>
+        <template v-else>
+          <button class="btnRegister-btn" @click="goToRegister">Registrati</button>
+          <button class="btnLogin-btn" @click="goToLogin">Login</button>
+        </template>
       </div>
 
       <div class="separator">oppure</div>
@@ -37,6 +43,11 @@ export default {
       scrittaNera: require('@/assets/scrittaNera.png'),
     };
   },
+  computed: {
+    isAuth() {
+      return !!localStorage.getItem('auth_token');
+    },
+  },
   methods: {
     goToLogin() {
       this.$router.push('/login');
@@ -47,6 +58,12 @@ export default {
     goCandidate() {
       // Vai alla parte "Francesco" senza autenticazione
       window.location.href = '/job_descriptions/';
+    },
+    goLogout() {
+      this.$router.push('/logout');
+    },
+    goToDashboard() {
+      this.$router.push('/dashboard');
     },
   },
 };

@@ -3,7 +3,7 @@
 
     <!-- Sidebar con i Tab -->
     <div class="tabs-sidebar">
-      <img :src="scrittaBianca" width="150px" class="titoloLogoDash" />
+      <router-link to="/"><img :src="scrittaBianca" width="150px" class="titoloLogoDash" /></router-link>
       <router-link to="/NuovoAnnuncio">
         <button class="nuovoAnnuncio">Nuovo annuncio</button>
       </router-link>

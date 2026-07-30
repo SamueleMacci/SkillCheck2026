@@ -15,3 +15,8 @@ export function updateCandidateStatus(id, status) {
 export function updateCandidateStage(id, payload /* {status_cv?, status_hr?, status_tech?} */) {
   return api.patch(`/candidates/${id}/state/`, payload).then(r => r.data);
 }
+
+// aggiorna il commento (persistito su DB) del candidato
+export function updateCandidateComment(id, comment) {
+  return api.patch(`/candidates/${id}/`, { comment }).then(r => r.data);
+}

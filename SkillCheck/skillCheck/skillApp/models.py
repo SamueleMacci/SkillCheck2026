@@ -67,6 +67,7 @@ class Resume(models.Model):
     job_description = models.ForeignKey(JobDescription, on_delete=models.CASCADE, default=1)
     resume_text = models.TextField(blank=True)
     pdf_file_upload = models.FileField(upload_to='pdf_resumes/', null=True, blank=True)
+    comment = models.TextField(blank=True, default='')
 
     def save(self, *args, **kwargs):
         if self.pdf_file_upload:

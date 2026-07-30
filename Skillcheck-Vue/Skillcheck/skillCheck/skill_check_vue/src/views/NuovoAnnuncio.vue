@@ -2,7 +2,7 @@
   <form @submit.prevent="RegistraAnnuncio">
     <div class="ContenitoreAnnunci">
       <div class="ContenitoreAnnunciDestra">
-        <img :src="scrittaBianca" width="150px" class="titoloLogoDash" />
+        <router-link to="/"><img :src="scrittaBianca" width="150px" class="titoloLogoDash" /></router-link>
         <router-link to="/dashboard">
           <button type="button" class="buttonTornaDashboard">Dashboard</button>
         </router-link>

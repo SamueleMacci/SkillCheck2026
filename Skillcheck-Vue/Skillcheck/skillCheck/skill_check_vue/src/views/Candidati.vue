@@ -120,7 +120,11 @@
             </td>
 
             <td>{{ row.plus }}</td>
-            <td>{{ row.commenti }}</td>
+            <td>
+              <textarea class="inputCommenti" v-model="row.commenti" rows="2"
+                placeholder="Aggiungi un commento..." @input="queueSaveComment(row)"
+                @blur="saveComment(row)"></textarea>
+            </td>
             <td>
               <img :src="row.flag" width="30" @click="openModal('info3', row)" />
             </td>
@@ -249,7 +253,7 @@
 
 <script>
 import { getJob } from '@/services/jobs';
-import { listCandidates, updateCandidateStatus, updateCandidateStage } from '@/services/candidates';
+import { listCandidates, updateCandidateStatus, updateCandidateStage, updateCandidateComment } from '@/services/candidates';
 
 export default {
   name: 'Candidati',
@@ -397,6 +401,7 @@ export default {
           flag: require('@/assets/flag.png'),
           plus: c.plus ?? '',
           commenti: c.comment || c.commenti || '',
+          _lastSavedComment: c.comment || c.commenti || '',
         }));
         const stats = { C: 0, I: 0, A: 0, N: 0 };
         for (const c of list) {
@@ -484,6 +489,25 @@ export default {
         console.error(e);
         alert('Salvataggio stato (fase) fallito.');
       }
+    },
+
+    async saveComment(row) {
+      if (row._lastSavedComment === row.commenti) return;
+      try {
+        await updateCandidateComment(row.id, row.commenti);
+        row._lastSavedComment = row.commenti;
+      } catch (e) {
+        console.error(e);
+        alert('Salvataggio commento fallito.');
+      }
+    },
+
+    queueSaveComment(row) {
+      // salva in automatico poco dopo l'ultima battitura, senza aspettare il blur
+      // (utile se l'utente ricarica/naviga via prima di uscire dal campo)
+      clearTimeout(this._commentTimers?.[row.id]);
+      if (!this._commentTimers) this._commentTimers = {};
+      this._commentTimers[row.id] = setTimeout(() => this.saveComment(row), 800);
     },
 
     async bulkUpdateSelected(newStatus) {
@@ -828,6 +852,17 @@ input[type="checkbox"]:checked::before {
   border-radius: 10px;
 
   border: 2px solid white;
+}
+
+.inputCommenti {
+  width: 160px;
+  min-height: 40px;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
 }
 
 .container {
