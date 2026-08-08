@@ -124,6 +124,7 @@
               <textarea class="inputCommenti" v-model="row.commenti" rows="2"
                 placeholder="Aggiungi un commento..." @input="queueSaveComment(row)"
                 @blur="saveComment(row)"></textarea>
+              <span v-if="row.commentSaving" class="statoCommento">Salvo…</span>
             </td>
             <td>
               <img :src="row.flag" width="30" @click="openModal('info3', row)" />
@@ -319,6 +320,15 @@ export default {
     await Promise.all([this.fetchCandidates(), this.fetchJobHeader()]);
   },
 
+  beforeUnmount() {
+    this.flushPendingComments();
+  },
+
+  beforeRouteLeave(to, from, next) {
+    this.flushPendingComments();
+    next();
+  },
+
   watch: {
     '$route.params.id'() {
       this.fetchCandidates();
@@ -334,7 +344,8 @@ export default {
     // -------- UX base --------
     toggleText() { this.expanded = !this.expanded; },
     goBack() {
-      this.$router.push({ name: 'dashboard', query: { r: Date.now() } });
+      const origin = this.$route.query.from === 'skillpath' ? 'SkillPath' : 'dashboard';
+      this.$router.push({ name: origin, query: { r: Date.now() } });
     },
     // -------- tabella / selezione --------
     getTextColor(bgColor) {
@@ -402,6 +413,7 @@ export default {
           plus: c.plus ?? '',
           commenti: c.comment || c.commenti || '',
           _lastSavedComment: c.comment || c.commenti || '',
+          commentSaving: false,
         }));
         const stats = { C: 0, I: 0, A: 0, N: 0 };
         for (const c of list) {
@@ -493,12 +505,15 @@ export default {
 
     async saveComment(row) {
       if (row._lastSavedComment === row.commenti) return;
+      row.commentSaving = true;
       try {
         await updateCandidateComment(row.id, row.commenti);
         row._lastSavedComment = row.commenti;
       } catch (e) {
         console.error(e);
         alert('Salvataggio commento fallito.');
+      } finally {
+        row.commentSaving = false;
       }
     },
 
@@ -508,6 +523,19 @@ export default {
       clearTimeout(this._commentTimers?.[row.id]);
       if (!this._commentTimers) this._commentTimers = {};
       this._commentTimers[row.id] = setTimeout(() => this.saveComment(row), 800);
+    },
+
+    flushPendingComments() {
+      // forza subito il salvataggio di eventuali commenti non ancora sincronizzati
+      // (chiamato quando si lascia la pagina, per non perdere modifiche fatte
+      // meno di 800ms prima della navigazione)
+      if (this._commentTimers) {
+        Object.values(this._commentTimers).forEach(clearTimeout);
+        this._commentTimers = {};
+      }
+      this.rows.forEach(row => {
+        if (row._lastSavedComment !== row.commenti) this.saveComment(row);
+      });
     },
 
     async bulkUpdateSelected(newStatus) {
@@ -863,6 +891,13 @@ input[type="checkbox"]:checked::before {
   padding: 6px;
   border-radius: 6px;
   border: 1px solid #ccc;
+}
+
+.statoCommento {
+  display: block;
+  font-size: 11px;
+  opacity: .7;
+  margin-top: 2px;
 }
 
 .container {

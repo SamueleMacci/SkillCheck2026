@@ -12,6 +12,7 @@ class PersonalityQuestion(models.Model):
 class JobDescription(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField()
+    is_public = models.BooleanField(default=True)
     resumes = models.ManyToManyField('Resume', related_name='job_descriptions')
     esperienze = models.TextField(blank=True)  # Campo per memorizzare la lista di esperienze
     competenze = models.TextField(blank=True)  # Campo per memorizzare la lista di competenze

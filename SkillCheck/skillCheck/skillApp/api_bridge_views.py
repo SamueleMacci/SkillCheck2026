@@ -12,6 +12,7 @@ from django.contrib.auth import authenticate, get_user_model
 from django.db import transaction
 from django.core.files.storage import Storage
 from django.http import HttpRequest
+from django.shortcuts import get_object_or_404
 #from django.core.mail import send_mail beckend mail import
 from django.core.mail import EmailMessage
 
@@ -23,9 +24,16 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
 
 # --- IMPORT LOCALI ---
-from .models import EmailTemplate, PersonalityCounter  # <--- models for mail
-from .personality_engine.calcolo_personalita import calcola_personalita  
+from .models import EmailTemplate, PersonalityCounter, PersonalityQuestion  # <--- models for mail
+from .personality_engine.calcolo_personalita import calcola_personalita
 from .utils import genera_consiglio_ia# <--- local ai
+from .forms import ResumeForm
+from .views import (
+    _get_domande_job_desc_resume,
+    save_domande_risposte,
+    build_mostra_domande_context,
+    parse_generated_questions,
+)
 
 from .utils import hash_personality
 # ------------ Model access (robusto a differenze di nomi) ------------
@@ -246,6 +254,7 @@ def jobs(request):
                 "content": _get(jd, 'description', 'content', default=''),
                 "deadline": _get(jd, 'deadline', 'scadenza', default=None),
                 "code": code,
+                "is_public": _get(jd, 'is_public', default=True),
                 "counts": compute_counts_for(code),
             })
         return Response(data)
@@ -255,19 +264,23 @@ def jobs(request):
     title = payload.get('name') or payload.get('title') or "Senza titolo"
     description = payload.get('content') or payload.get('description') or ""
     deadline = payload.get('deadline', None)
+    is_public = payload.get('is_public', True)
 
     jd = JD()
     _set(jd, 'title', title) or _set(jd, 'name', title)
     _set(jd, 'description', description) or _set(jd, 'content', description)
     _set(jd, 'deadline', deadline)
+    _set(jd, 'is_public', is_public)
     jd.save()
 
     code = str(jd.pk)
     return Response({
+        "id": jd.pk,
         "name": title,
         "content": description,
         "deadline": deadline,
         "code": code,
+        "is_public": is_public,
         "counts": compute_counts_for(code),
     }, status=http_status.HTTP_201_CREATED)
 
@@ -286,6 +299,7 @@ def job_detail(request, code):
         "content": _get(jd, 'description', 'content', default=''),
         "deadline": _get(jd, 'deadline', 'scadenza', default=None),
         "code": str(jd.pk),
+        "is_public": _get(jd, 'is_public', default=True),
         "counts": compute_counts_for(str(jd.pk)),
     })
 
@@ -606,3 +620,110 @@ def logout(request):
     """
     Token.objects.filter(user=request.user).delete()
     return Response({'detail': 'logout ok'})
+
+
+# ------------ Flusso candidato (pubblico, senza login) ------------
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def apply_for_job_api(request, job_description_id):
+    """
+    Candidatura di un candidato anonimo a una JD.
+    body multipart: name, email, pdf_file_upload (file PDF)
+    """
+    job_description = get_object_or_404(JD, pk=job_description_id)
+
+    form = ResumeForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return Response({'errors': form.errors}, status=http_status.HTTP_400_BAD_REQUEST)
+
+    resume = form.save(commit=False)
+    resume.job_description = job_description
+    resume.save()
+    job_description.resumes.add(resume)
+
+    return Response(
+        {'resume_id': resume.id, 'job_description_id': job_description.id},
+        status=http_status.HTTP_201_CREATED,
+    )
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def mostra_domande_api(request, resume_id, job_description_id):
+    """
+    GET: restituisce le domande (JD + resume + gap generati dall'IA) per il candidato.
+    POST: salva le risposte (stessa convenzione di nomi campo della form Django:
+          domanda_job_desc_<n>, domanda_resume_<n>, gap_yesno_<i>, gap_short_<j>, gap_short_skill_<j>).
+    """
+    resume = get_object_or_404(Resume, pk=resume_id)
+    job_description = get_object_or_404(JD, pk=job_description_id)
+
+    domande_job_desc, domande_resume = _get_domande_job_desc_resume(resume, job_description)
+
+    if request.method == 'POST':
+        save_domande_risposte(resume, domande_job_desc, domande_resume, request.data)
+        return Response({'next': 'personality_test', 'resume_id': resume.id})
+
+    context = build_mostra_domande_context(resume, job_description, domande_job_desc, domande_resume)
+    return Response(context)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def personality_test_api(request, resume_id):
+    """
+    GET: restituisce le domande del test di personalità.
+    POST: salva le risposte (body: {"domanda_1": 1..7, "domanda_2": ..., ...}).
+    """
+    resume = get_object_or_404(Resume, pk=resume_id)
+
+    if request.method == 'GET':
+        domande = PersonalityQuestion.objects.all().order_by('id')
+        return Response([{'id': d.id, 'testo': d.testo} for d in domande])
+
+    total = PersonalityQuestion.objects.count()
+    risposte = {}
+    for i in range(1, total + 1):
+        campo = f"domanda_{i}"
+        if campo in request.data:
+            try:
+                risposte[str(i)] = int(request.data.get(campo))
+            except (TypeError, ValueError):
+                continue
+
+    resume.risposte_personalita_raw = risposte
+    resume.save()
+
+    return Response({
+        'message': 'Grazie per aver completato il test di personalità! '
+                    'Le tue risposte sono state salvate in modo sicuro.',
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def select_questions_api(request, job_description_id):
+    """Restituisce le domande auto-generate (esperienze/competenze/titoli) per una JD."""
+    job_description = get_object_or_404(JD, pk=job_description_id)
+    return Response(parse_generated_questions(job_description))
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def save_selected_questions_api(request, job_description_id):
+    """
+    Salva le domande selezionate (+ eventuali nuove aggiunte) per una JD.
+    body: { selected_esperienze: [...], selected_competenze: [...], selected_titoli_di_studio: [...] }
+    """
+    job_description = get_object_or_404(JD, pk=job_description_id)
+    payload = request.data or {}
+
+    esperienze = payload.get('selected_esperienze') or []
+    competenze = payload.get('selected_competenze') or []
+    titoli = payload.get('selected_titoli_di_studio') or []
+
+    job_description.save_selected_questions(esperienze, competenze, titoli)
+
+    next_page = 'dashboard' if getattr(job_description, 'is_public', True) else 'SkillPath'
+    return Response({'next': next_page})

@@ -11,8 +11,17 @@ export function getJob(code) {
   return api.get(`/jobs/${code}/`).then(r => r.data)
 }
 
-export function createJob({ name, content, deadline = null }) {
-  return api.post('/jobs/', { name, content, deadline }).then(r => r.data)
+export function createJob({ name, content, deadline = null, is_public = true }) {
+  return api.post('/jobs/', { name, content, deadline, is_public }).then(r => r.data)
+}
+
+// DOMANDE AUTO-GENERATE per una JD (selezione domande da porre al candidato)
+export function getSelectQuestions(jobId) {
+  return api.get(`/select_questions/${jobId}/`).then(r => r.data)
+}
+
+export function saveSelectedQuestions(jobId, payload) {
+  return api.post(`/select_questions/${jobId}/save/`, payload).then(r => r.data)
 }
 
 // CANDIDATI di una JD

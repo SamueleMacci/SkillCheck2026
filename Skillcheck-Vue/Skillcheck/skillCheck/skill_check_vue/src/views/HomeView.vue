@@ -11,6 +11,7 @@
       <div class="contenitoreButton">
         <template v-if="isAuth">
           <button class="btnRegister-btn" @click="goToDashboard">Dashboard</button>
+          <button class="btnRegister-btn" @click="goToSkillPath">SkillPath</button>
           <button class="btnLogin-btn" @click="goLogout">Logout</button>
         </template>
         <template v-else>
@@ -56,14 +57,16 @@ export default {
       this.$router.push('/registrati');
     },
     goCandidate() {
-      // Vai alla parte "Francesco" senza autenticazione
-      window.location.href = '/job_descriptions/';
+      this.$router.push('/JobDescriptions');
     },
     goLogout() {
       this.$router.push('/logout');
     },
     goToDashboard() {
       this.$router.push('/dashboard');
+    },
+    goToSkillPath() {
+      this.$router.push('/SkillPath');
     },
   },
 };

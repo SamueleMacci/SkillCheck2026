@@ -48,34 +48,40 @@ def create_job_description(request):
     return render(request, "create_job_description_form.html", {"form": form})
 
 
-def select_questions_for_job_description(request, job_description_id):
-    job_description = JobDescription.objects.get(pk=job_description_id)
+def _clean_generated_question(question):
+    return question.strip("[]{}' ").strip('"')
 
-    def clean_question(question):
-        return question.strip("[]{}' ").strip('"')
 
+def parse_generated_questions(job_description):
+    """Estrae le domande auto-generate (esperienze/competenze/titoli di studio)
+    dai campi testuali salvati sulla JobDescription."""
     esperienze_questions = [
-        clean_question(question)
+        _clean_generated_question(question)
         for questions_chunk in job_description.domande_esperienze.split("',")
         for question in questions_chunk.split('",')
     ]
     competenze_questions = [
-        clean_question(question)
+        _clean_generated_question(question)
         for questions_chunk in job_description.domande_competenze.split("',")
         for question in questions_chunk.split('",')
     ]
     titoli_di_studio_questions = [
-        clean_question(question)
+        _clean_generated_question(question)
         for questions_chunk in job_description.domande_titoli_di_studio.split("',")
         for question in questions_chunk.split('",')
     ]
-
-    context = {
-        "job_description": job_description,
+    return {
         "esperienze_questions": esperienze_questions,
         "competenze_questions": competenze_questions,
         "titoli_di_studio_questions": titoli_di_studio_questions,
     }
+
+
+def select_questions_for_job_description(request, job_description_id):
+    job_description = JobDescription.objects.get(pk=job_description_id)
+
+    context = {"job_description": job_description}
+    context.update(parse_generated_questions(job_description))
     return render(request, "select_questions_for_job_description.html", context)
 
 
@@ -109,7 +115,8 @@ def save_selected_questions(request, pk):
         all_selected_esperienze, all_selected_competenze, all_selected_titoli_di_studio
     )
     ts = int(time.time())
-    return HttpResponseRedirect(f"/skillcheck/#/dashboard?r={ts}")
+    destinazione = "dashboard" if getattr(job_description, "is_public", True) else "SkillPath"
+    return HttpResponseRedirect(f"/skillcheck/#/{destinazione}?r={ts}")
 
 
 def apply_for_job(request, job_description_id):
@@ -141,54 +148,52 @@ def apply_for_job(request, job_description_id):
     )
 
 
-def mostra_domande(request, resume_id, job_description_id):
-    def _normalize(s: str) -> str:
-        s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
-        s = re.sub(r"[^a-z0-9]+", " ", s.lower()).strip()
-        return s
+def _normalize(s: str) -> str:
+    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
+    s = re.sub(r"[^a-z0-9]+", " ", s.lower()).strip()
+    return s
 
-    def canon_skill(s: str) -> str:
-        """
-        Estrae il 'cuore' della skill da una domanda JD tipica.
-        Esempi:
-        'Sai programmare in C++?' -> 'C++'
-        'Hai mai utilizzato Git?' -> 'Git'
-        'Hai esperienza con PostgreSQL?' -> 'PostgreSQL'
-        """
-        if not isinstance(s, str):
-            return ""
-        s0 = s.strip()
 
-        # 1) pattern "sai programmare in X"
-        m = re.search(r"sai programmare in\s+([A-Za-z0-9\+\#\.\-_ ]+)", s0, flags=re.I)
-        if m:
-            return m.group(1).strip(" ?.,")
+def canon_skill(s: str) -> str:
+    """
+    Estrae il 'cuore' della skill da una domanda JD tipica.
+    Esempi:
+    'Sai programmare in C++?' -> 'C++'
+    'Hai mai utilizzato Git?' -> 'Git'
+    'Hai esperienza con PostgreSQL?' -> 'PostgreSQL'
+    """
+    if not isinstance(s, str):
+        return ""
+    s0 = s.strip()
 
-        # 2) pattern "hai (mai )?utilizzato X"
-        m = re.search(
-            r"hai (mai )?utilizzato\s+([A-Za-z0-9\+\#\.\-_ ]+)", s0, flags=re.I
-        )
-        if m:
-            return m.group(2).strip(" ?.,")
+    # 1) pattern "sai programmare in X"
+    m = re.search(r"sai programmare in\s+([A-Za-z0-9\+\#\.\-_ ]+)", s0, flags=re.I)
+    if m:
+        return m.group(1).strip(" ?.,")
 
-        # 3) pattern "hai esperienza con X"
-        m = re.search(r"hai esperienza con\s+([A-Za-z0-9\+\#\.\-_ ]+)", s0, flags=re.I)
-        if m:
-            return m.group(1).strip(" ?.,")
+    # 2) pattern "hai (mai )?utilizzato X"
+    m = re.search(
+        r"hai (mai )?utilizzato\s+([A-Za-z0-9\+\#\.\-_ ]+)", s0, flags=re.I
+    )
+    if m:
+        return m.group(2).strip(" ?.,")
 
-        # 4) fallback: togli boilerplate comuni e punteggiatura finale
-        s1 = re.sub(
-            r"^(sai|conosci|hai esperienza|hai mai utilizzato|hai competenze)\s+(in|con)?\s*",
-            "",
-            s0,
-            flags=re.I,
-        )
-        return s1.strip(" ?.,")
+    # 3) pattern "hai esperienza con X"
+    m = re.search(r"hai esperienza con\s+([A-Za-z0-9\+\#\.\-_ ]+)", s0, flags=re.I)
+    if m:
+        return m.group(1).strip(" ?.,")
 
-    resume = get_object_or_404(Resume, pk=resume_id)
-    job_description = get_object_or_404(JobDescription, pk=job_description_id)
+    # 4) fallback: togli boilerplate comuni e punteggiatura finale
+    s1 = re.sub(
+        r"^(sai|conosci|hai esperienza|hai mai utilizzato|hai competenze)\s+(in|con)?\s*",
+        "",
+        s0,
+        flags=re.I,
+    )
+    return s1.strip(" ?.,")
 
-    # --- JD & Resume questions prep ---
+
+def _get_domande_job_desc_resume(resume, job_description):
     domande_job_desc = []
     if job_description.domande_selezionate:
         domande_job_desc = [
@@ -201,87 +206,91 @@ def mostra_domande(request, resume_id, job_description_id):
         for d in resume_questions_raw.split("',")
         if d.strip().strip("'")
     ]
+    return domande_job_desc, domande_resume
+
+
+def save_domande_risposte(resume, domande_job_desc, domande_resume, risposte):
+    """Salva le risposte alle domande JD/resume/gap per un resume.
+    `risposte` è un dict-like (request.POST oppure request.data)."""
+    punteggio_affinita = 0
+    domande_e_risposte = {}
+
+    for chiave, valore in risposte.items():
+        if chiave.startswith("domanda_job_desc_"):
+            try:
+                idx = int(chiave.split("_")[-1]) - 1
+                testo_domanda = domande_job_desc[idx]
+            except Exception:
+                continue
+            domande_e_risposte[testo_domanda] = valore
+            if valore == "si":
+                punteggio_affinita += 1
+
+        elif chiave.startswith("domanda_resume_"):
+            try:
+                idx = int(chiave.split("_")[-1]) - 1
+                testo_domanda = domande_resume[idx]
+            except Exception:
+                continue
+            domande_e_risposte[testo_domanda] = valore
+            if valore == "si":
+                punteggio_affinita += 1
+
+    # Risposte GAP
+    gap_answers, yes_count, no_count = [], 0, 0
+    i = 0
+    while True:
+        key = f"gap_yesno_{i}"
+        if key not in risposte:
+            break
+        val = risposte.get(key)
+        if val == "si":
+            yes_count += 1
+        elif val == "no":
+            no_count += 1
+        gap_answers.append({"type": "yesno", "index": i, "value": val})
+        i += 1
+
+    j = 0
+    while True:
+        key = f"gap_short_{j}"
+        if key not in risposte:
+            break
+        text = (risposte.get(key) or "").strip()
+        skill = risposte.get(f"gap_short_skill_{j}") or None
+        gap_answers.append(
+            {"type": "short", "index": j, "value": text, "skill": skill}
+        )
+        j += 1
+
+    gap_summary = {
+        "yes": yes_count,
+        "no": no_count,
+        "total_yesno": yes_count + no_count,
+    }
+
+    # (opzionale) salva anche matrix/gaps per audit
+    jd_skills = [str(s) for s in domande_job_desc]
+    cv_skills = [str(s) for s in domande_resume]
+    matrix_payload = build_jd_cv_matrix(jd_skills, cv_skills)
+    gaps = extract_skill_gaps(matrix_payload)
+
+    resume.domande_affinity = punteggio_affinita
+    base = domande_e_risposte if isinstance(domande_e_risposte, dict) else {}
+    base["gap_answers"] = gap_answers
+    base["gap_summary"] = gap_summary
+    base["gap_overall"] = None
+    base["skill_alignment"] = matrix_payload
+    base["skill_gaps"] = gaps
+    resume.domande_e_risposte = base
+    resume.save_affinity()
+
+
+def build_mostra_domande_context(resume, job_description, domande_job_desc, domande_resume):
+    """Genera le domande GAP (IA) e assembla il contesto per la pagina 'mostra domande'."""
     resume_start = len(domande_job_desc)
 
-    if request.method == "POST":
-        # -------------------- POST: salvataggi --------------------
-        risposte = request.POST
-        punteggio_affinita = 0
-        domande_e_risposte = {}
-
-        for chiave, valore in risposte.items():
-            if chiave.startswith("domanda_job_desc_"):
-                try:
-                    idx = int(chiave.split("_")[-1]) - 1
-                    testo_domanda = domande_job_desc[idx]
-                except Exception:
-                    continue
-                domande_e_risposte[testo_domanda] = valore
-                if valore == "si":
-                    punteggio_affinita += 1
-
-            elif chiave.startswith("domanda_resume_"):
-                try:
-                    idx = int(chiave.split("_")[-1]) - 1
-                    testo_domanda = domande_resume[idx]
-                except Exception:
-                    continue
-                domande_e_risposte[testo_domanda] = valore
-                if valore == "si":
-                    punteggio_affinita += 1
-
-        # Risposte GAP
-        gap_answers, yes_count, no_count = [], 0, 0
-        i = 0
-        while True:
-            key = f"gap_yesno_{i}"
-            if key not in risposte:
-                break
-            val = risposte.get(key)
-            if val == "si":
-                yes_count += 1
-            elif val == "no":
-                no_count += 1
-            gap_answers.append({"type": "yesno", "index": i, "value": val})
-            i += 1
-
-        j = 0
-        while True:
-            key = f"gap_short_{j}"
-            if key not in risposte:
-                break
-            text = (risposte.get(key) or "").strip()
-            skill = risposte.get(f"gap_short_skill_{j}") or None
-            gap_answers.append(
-                {"type": "short", "index": j, "value": text, "skill": skill}
-            )
-            j += 1
-
-        gap_summary = {
-            "yes": yes_count,
-            "no": no_count,
-            "total_yesno": yes_count + no_count,
-        }
-
-        # (opzionale) salva anche matrix/gaps per audit
-        jd_skills = [str(s) for s in domande_job_desc]
-        cv_skills = [str(s) for s in domande_resume]
-        matrix_payload = build_jd_cv_matrix(jd_skills, cv_skills)
-        gaps = extract_skill_gaps(matrix_payload)
-
-        resume.domande_affinity = punteggio_affinita
-        base = domande_e_risposte if isinstance(domande_e_risposte, dict) else {}
-        base["gap_answers"] = gap_answers
-        base["gap_summary"] = gap_summary
-        base["gap_overall"] = None
-        base["skill_alignment"] = matrix_payload
-        base["skill_gaps"] = gaps
-        resume.domande_e_risposte = base
-        resume.save_affinity()
-
-        return redirect("personality_test", resume_id=resume.id)
-
-    # -------------------- GET: genera domande GAP e mostra pagina --------------------
+    # -------------------- genera domande GAP --------------------
     jd_skills_raw = [str(s) for s in domande_job_desc]
     jd_skills = [canon_skill(s) for s in jd_skills_raw]
     cv_skills = [str(s) for s in domande_resume]
@@ -482,13 +491,28 @@ def mostra_domande(request, resume_id, job_description_id):
 
     gap_questions = (gap_questions or [])[:3]
 
-    context = {
-        "resume": resume,
+    return {
         "domande_job_desc": domande_job_desc,
         "domande_resume": domande_resume,
         "resume_start": resume_start,
         "gap_questions": gap_questions,
     }
+
+
+def mostra_domande(request, resume_id, job_description_id):
+    resume = get_object_or_404(Resume, pk=resume_id)
+    job_description = get_object_or_404(JobDescription, pk=job_description_id)
+
+    # --- JD & Resume questions prep ---
+    domande_job_desc, domande_resume = _get_domande_job_desc_resume(resume, job_description)
+
+    if request.method == "POST":
+        save_domande_risposte(resume, domande_job_desc, domande_resume, request.POST)
+        return redirect("personality_test", resume_id=resume.id)
+
+    # -------------------- GET: genera domande GAP e mostra pagina --------------------
+    context = build_mostra_domande_context(resume, job_description, domande_job_desc, domande_resume)
+    context["resume"] = resume
     return render(request, "mostra_domande.html", context)
 
 

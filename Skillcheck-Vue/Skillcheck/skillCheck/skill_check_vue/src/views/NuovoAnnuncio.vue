@@ -44,6 +44,22 @@
             </button>
           </div>
         </div>
+        <div class="ModalitaDiv">
+          <br>
+          <h2 class="titoloNuovo">Visibilità</h2>
+          <div class="button-group">
+            <button v-for="option in optionsVisibilita" :key="option.value"
+              @click.prevent="visibilita = option.value"
+              :class="{ 'selected': visibilita === option.value }" class="option-buttonModalita">
+              {{ option.label }}
+            </button>
+          </div>
+          <p class="hint-visibilita">
+            {{ visibilita === 'pubblico'
+              ? 'Visibile in Dashboard e nella lista pubblica degli annunci.'
+              : 'Visibile solo in SkillPath, non compare tra gli annunci pubblici.' }}
+          </p>
+        </div>
       </div>
       <div class="ContenitoreAnnunciSinistra">
         <button class="salvaAnnuncio" :disabled="saving" :aria-busy="saving">
@@ -72,6 +88,11 @@ export default {
       selectedOption: '',
       selectedModalita: '',
       selectedOrario: '',
+      visibilita: 'pubblico',
+      optionsVisibilita: [
+        { label: "Pubblico", value: "pubblico" },
+        { label: "Privato", value: "privato" },
+      ],
       options: [
         { label: "Tempo indeterminato", value: "Tempo indeterminato" },
         { label: "Tempo determinato", value: "Tempo determinato" },
@@ -114,6 +135,7 @@ export default {
           name: this.form.JobPosition,
           content,
           deadline: this.form.deadline || null,
+          is_public: this.visibilita === 'pubblico',
         };
 
         // crea JD
@@ -127,7 +149,7 @@ export default {
         }
         const id = String(jdId || code || '').trim();
         if (id) {
-          window.location.replace(`/${encodeURIComponent(id)}/select_questions/`);
+          this.$router.push(`/SelectQuestions/${encodeURIComponent(id)}`);
           return;
         }
         this.$router.push({ name: 'dashboard' });
@@ -209,6 +231,12 @@ export default {
   margin-left: 5%;
   font-size: 30px;
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.hint-visibilita {
+  margin: 8px 5% 0;
+  font-size: 13px;
+  color: #555;
 }
 
 .inputAnnuncio {
