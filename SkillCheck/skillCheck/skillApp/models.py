@@ -7,7 +7,17 @@ from django_cryptography.fields import encrypt
 class PersonalityQuestion(models.Model):
     testo = models.TextField()
     tratto = models.CharField(max_length=1)  # E, A, C, O, N
-    direzione = models.CharField(max_length=1)  # + o -  
+    direzione = models.CharField(max_length=1)  # + o -
+
+class Employee(models.Model):
+    """Dipendente interno, inserito manualmente dal recruiter, usato come
+    possibile candidato per gli annunci privati (SkillPath)."""
+    nome = models.CharField(max_length=255)
+    email = models.EmailField()
+    reparto = models.CharField(max_length=255, blank=True)
+
+    def __str__(self):
+        return self.nome
 
 class JobDescription(models.Model):
     title = models.CharField(max_length=255)
@@ -71,6 +81,15 @@ class Resume(models.Model):
     comment = models.TextField(blank=True, default='')
 
     def save(self, *args, **kwargs):
+        # Se il chiamante ha chiesto un salvataggio mirato (update_fields) e non
+        # tocca il PDF, non c'è motivo di ri-estrarre/ri-confrontare tutto il CV
+        # (operazione costosa: PDF, NER, 3 inferenze BERT) solo per salvare
+        # ad es. un commento o uno stato — era la causa di richieste bloccate
+        # per minuti quando si scriveva nella colonna commenti.
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None and 'pdf_file_upload' not in update_fields:
+            super().save(*args, **kwargs)
+            return
         if self.pdf_file_upload:
             with self.pdf_file_upload.open('rb') as f:
                 # Leggi il contenuto del file

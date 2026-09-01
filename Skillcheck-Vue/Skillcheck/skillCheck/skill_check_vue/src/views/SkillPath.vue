@@ -8,6 +8,9 @@
       <router-link to="/NuovoAnnuncio">
         <button class="nuovoAnnuncio">Nuovo annuncio</button>
       </router-link>
+      <router-link to="/Employees">
+        <button class="nuovoAnnuncio">Dipendenti</button>
+      </router-link>
 
       <button class="buttonTab" v-for="(tab, index) in tabs" :key="tab.id || index"
         :class="{ active: activeTab === index }" @click="activeTab = index">
@@ -54,6 +57,26 @@
         <p class="idContenutoPagina">{{ current.id }}</p><br />
         <h3>Scadenza Candidatura: {{ current.scadenza }}</h3><br />
         <p class="ContenutoLi">{{ current.content }}</p>
+
+        <div class="nominaBox">
+          <h3>Nomina candidato</h3>
+          <div class="nominaRow">
+            <select v-model="selectedEmployeeId">
+              <option disabled value="">Scegli un dipendente…</option>
+              <option v-for="e in employees" :key="e.id" :value="e.id">
+                {{ e.nome }} ({{ e.email }})
+              </option>
+            </select>
+            <button :disabled="!selectedEmployeeId || nominating" @click="nominate">
+              {{ nominating ? 'Nomina…' : 'Nomina' }}
+            </button>
+          </div>
+          <p v-if="!employees.length" class="hint">
+            Nessun dipendente in elenco — <router-link to="/Employees">aggiungine uno</router-link>.
+          </p>
+          <p v-if="nominateMessage" class="success">{{ nominateMessage }}</p>
+          <p v-if="nominateError" class="error">{{ nominateError }}</p>
+        </div>
       </div>
     </div>
 
@@ -73,6 +96,7 @@
 
 <script>
 import { listJobs } from '@/services/jobs';
+import { listEmployees, nominateCandidate } from '@/services/employees';
 export default {
   name: 'SkillPath',
   data() {
@@ -83,6 +107,11 @@ export default {
       errorJobs: null,
       scrittaBianca: require('@/assets/scrittaBianca.png'),
       imgCircle: require('@/assets/ArrowRightIcon.png'),
+      employees: [],
+      selectedEmployeeId: '',
+      nominating: false,
+      nominateMessage: null,
+      nominateError: null,
     };
   },
 
@@ -134,10 +163,37 @@ export default {
         this.loadingJobs = false;
       }
     },
+
+    async fetchEmployees() {
+      try {
+        this.employees = await listEmployees();
+      } catch (e) {
+        console.error(e);
+      }
+    },
+
+    async nominate() {
+      if (!this.selectedEmployeeId || !this.current) return;
+      this.nominating = true;
+      this.nominateMessage = null;
+      this.nominateError = null;
+      try {
+        await nominateCandidate(this.current.id, this.selectedEmployeeId);
+        const nome = this.employees.find(e => e.id === this.selectedEmployeeId)?.nome || '';
+        this.nominateMessage = `${nome} nominato/a come candidato/a.`;
+        this.selectedEmployeeId = '';
+        await this.fetchJobs();
+      } catch (e) {
+        console.error(e);
+        this.nominateError = 'Nomina fallita.';
+      } finally {
+        this.nominating = false;
+      }
+    },
   },
 
   async mounted() {
-    await this.fetchJobs();
+    await Promise.all([this.fetchJobs(), this.fetchEmployees()]);
   },
 };
 </script>
@@ -166,6 +222,50 @@ export default {
   margin-top: 0;
   text-align: right;
   width: auto;
+}
+
+.nominaBox {
+  margin-top: 24px;
+  padding: 16px;
+  border-radius: 10px;
+  background: #f4f4f4;
+  max-width: 500px;
+}
+.nominaRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.nominaRow select {
+  flex: 1;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+.nominaRow button {
+  background: rgb(43, 42, 42);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 18px;
+  cursor: pointer;
+}
+.nominaRow button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.hint {
+  font-size: 13px;
+  color: #666;
+  margin-top: 8px;
+}
+.success {
+  color: #1b7a2e;
+  margin-top: 8px;
+}
+.error {
+  color: #b00020;
+  margin-top: 8px;
 }
 
 .skillPathLabel {

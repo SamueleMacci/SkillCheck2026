@@ -168,7 +168,7 @@ export default {
 };
 </script>
 
-<style>
+<style scoped>
 .ContenitoreAnnunci {
   display: flex;
   align-items: left;

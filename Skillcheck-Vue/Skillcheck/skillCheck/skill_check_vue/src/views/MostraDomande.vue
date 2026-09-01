@@ -1,5 +1,13 @@
 <template>
   <div class="mostra-container">
+    <template v-if="completed">
+      <div class="card">
+        <h1>Grazie!</h1>
+        <p>{{ completionMessage }}</p>
+      </div>
+    </template>
+
+    <template v-else>
     <h1>Domande Selezionate</h1>
 
     <p v-if="loading">Caricamento…</p>
@@ -48,6 +56,7 @@
         {{ sending ? 'Invio in corso…' : 'Salva' }}
       </button>
     </form>
+    </template>
   </div>
 </template>
 
@@ -69,6 +78,8 @@ export default {
       loadError: null,
       sending: false,
       submitError: null,
+      completed: false,
+      completionMessage: '',
     };
   },
   computed: {
@@ -124,8 +135,12 @@ export default {
 
       this.sending = true;
       try {
-        await postMostraDomande(this.resumeId, this.jobCode, payload);
-        this.$router.push(`/PersonalityTest/${this.resumeId}`);
+        const res = await postMostraDomande(this.resumeId, this.jobCode, payload);
+        // il test di personalità non è più raggiunto con un redirect automatico:
+        // arriva un link via email al candidato (vedi backend, mostra_domande_api)
+        this.completionMessage = res.message ||
+          'Grazie! La preghiamo di controllare la sua email per la finalizzazione della sua candidatura.';
+        this.completed = true;
       } catch (e) {
         console.error(e);
         this.submitError = 'Salvataggio fallito. Riprova.';
@@ -184,5 +199,11 @@ export default {
 }
 .error {
   color: #b00020;
+}
+.card {
+  padding: 24px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  max-width: 700px;
 }
 </style>

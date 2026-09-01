@@ -80,7 +80,7 @@
             </td>
 
             <td>
-              <button @click="openModal('info2', row)" class="buttonMediaTab">{{ row.media }}</button>
+              <button @click="openModal('info2', row)" class="buttonMediaTab">{{ fmt(row.media) }}</button>
             </td>
 
             <!-- CV -->
@@ -121,9 +121,10 @@
 
             <td>{{ row.plus }}</td>
             <td>
-              <textarea class="inputCommenti" v-model="row.commenti" rows="2"
-                placeholder="Aggiungi un commento..." @input="queueSaveComment(row)"
-                @blur="saveComment(row)"></textarea>
+              <button class="anteprimaCommento" @click="openModal('comment', row)">
+                <span v-if="row.commenti">{{ row.commenti }}</span>
+                <span v-else class="placeholderCommento">Aggiungi un commento…</span>
+              </button>
               <span v-if="row.commentSaving" class="statoCommento">Salvo…</span>
             </td>
             <td>
@@ -248,6 +249,22 @@
         </div>
       </div>
 
+      <!-- Modal Commento -->
+      <div v-if="showModal && modalType === 'comment'" class="modal-overlay" @click="closeCommentModal">
+        <div class="modal-content modal-content--commento" @click.stop>
+          <button class="close-btn" @click="closeCommentModal">✖</button>
+          <h1>Commento:</h1>
+          <h2>{{ selectedRow.name }}</h2>
+          <textarea class="inputCommentoModal" v-model="selectedRow.commenti"
+            placeholder="Scrivi qui il commento su questo candidato…"
+            @input="queueSaveComment(selectedRow)" @blur="saveComment(selectedRow)"></textarea>
+          <p class="statoCommentoModal">
+            <span v-if="selectedRow.commentSaving">Salvo…</span>
+            <span v-else>Salvato automaticamente.</span>
+          </p>
+        </div>
+      </div>
+
     </div>
   </div>
 </template>
@@ -255,6 +272,7 @@
 <script>
 import { getJob } from '@/services/jobs';
 import { listCandidates, updateCandidateStatus, updateCandidateStage, updateCandidateComment } from '@/services/candidates';
+import api from '@/services/api';
 
 export default {
   name: 'Candidati',
@@ -318,10 +336,12 @@ export default {
 
   async mounted() {
     await Promise.all([this.fetchCandidates(), this.fetchJobHeader()]);
+    window.addEventListener('beforeunload', this.flushPendingCommentsBeacon);
   },
 
   beforeUnmount() {
     this.flushPendingComments();
+    window.removeEventListener('beforeunload', this.flushPendingCommentsBeacon);
   },
 
   beforeRouteLeave(to, from, next) {
@@ -374,6 +394,11 @@ export default {
       this.showModal = false;
       this.modalType = '';
       this.selectedRow = null;
+    },
+    closeCommentModal() {
+      // forza il salvataggio immediato (senza aspettare debounce/blur) prima di chiudere
+      if (this.selectedRow) this.saveComment(this.selectedRow);
+      this.closeModal();
     },
     // -------- API --------
     async fetchCandidates() {
@@ -535,6 +560,21 @@ export default {
       }
       this.rows.forEach(row => {
         if (row._lastSavedComment !== row.commenti) this.saveComment(row);
+      });
+    },
+
+    flushPendingCommentsBeacon() {
+      // ultima rete di salvataggio: scatta su un vero evento di chiusura/reload
+      // del browser (F5, chiusura scheda) — a differenza di beforeRouteLeave/
+      // beforeUnmount, che coprono solo la navigazione dentro la SPA e non
+      // vengono mai chiamati in questo caso. sendBeacon (a differenza di una
+      // normale richiesta async) è pensato per sopravvivere alla chiusura pagina.
+      if (!navigator.sendBeacon) return;
+      const base = (api.defaults.baseURL || '/api/').replace(/\/$/, '');
+      this.rows.forEach(row => {
+        if (row._lastSavedComment === row.commenti) return;
+        const blob = new Blob([JSON.stringify({ comment: row.commenti })], { type: 'application/json' });
+        navigator.sendBeacon(`${base}/candidates/${row.id}/`, blob);
       });
     },
 
@@ -783,6 +823,7 @@ input[type="checkbox"]:checked::before {
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 1000;
 }
 
 .modal-content {
@@ -882,15 +923,31 @@ input[type="checkbox"]:checked::before {
   border: 2px solid white;
 }
 
-.inputCommenti {
+.anteprimaCommento {
   width: 160px;
   min-height: 40px;
-  resize: vertical;
+  max-height: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   font-family: inherit;
   font-size: 13px;
+  text-align: left;
   padding: 6px;
   border-radius: 6px;
   border: 1px solid #ccc;
+  background: white;
+  cursor: pointer;
+}
+.anteprimaCommento:hover {
+  border-color: rgb(43, 42, 42);
+}
+
+.placeholderCommento {
+  color: #999;
+  font-style: italic;
 }
 
 .statoCommento {
@@ -898,6 +955,33 @@ input[type="checkbox"]:checked::before {
   font-size: 11px;
   opacity: .7;
   margin-top: 2px;
+}
+
+.modal-content--commento {
+  width: 600px;
+  height: auto;
+  max-width: 90vw;
+  padding: 24px;
+  text-align: left;
+}
+
+.inputCommentoModal {
+  width: 100%;
+  min-height: 260px;
+  margin-top: 12px;
+  padding: 12px;
+  font-family: inherit;
+  font-size: 15px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.statoCommentoModal {
+  margin-top: 8px;
+  font-size: 13px;
+  opacity: .7;
 }
 
 .container {

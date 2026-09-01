@@ -24,7 +24,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
 
 # --- IMPORT LOCALI ---
-from .models import EmailTemplate, PersonalityCounter, PersonalityQuestion  # <--- models for mail
+from .models import EmailTemplate, PersonalityCounter, PersonalityQuestion, Employee  # <--- models for mail
 from .personality_engine.calcolo_personalita import calcola_personalita
 from .utils import genera_consiglio_ia# <--- local ai
 from .forms import ResumeForm
@@ -207,13 +207,13 @@ def _resume_to_row(request, r, job_code):
         parts = [_to_num(score_title), _to_num(score_skills), _to_num(score_experience)]
         parts = [p for p in parts if p is not None]
         if parts:
-            score_similarity = sum(parts) / len(parts)
+            score_similarity = round(sum(parts) / len(parts), 2)
     if score_avg in (None, ''):
         ms = _to_num(score_similarity)
         q  = _to_num(score_questions)
         comps = [v for v in (ms, q) if v is not None]
         if comps:
-            score_avg = sum(comps) / len(comps)
+            score_avg = round(sum(comps) / len(comps), 2)
     pdf_url     = request.build_absolute_uri(f"/view_pdf/{r.pk}/")
     answers_url = request.build_absolute_uri(f"/risposte_domande/{r.pk}/")
     return {
@@ -320,9 +320,12 @@ def candidates_by_job(request, code):
     rows = [_resume_to_row(request, r, code) for r in qs]
     return Response(rows)
 
-@api_view(['PATCH'])
+@api_view(['PATCH', 'POST'])
 @permission_classes([AllowAny])
 def candidate_update(request, pk):
+    # POST accettato solo per navigator.sendBeacon() (usato per salvare i
+    # commenti quando l'utente chiude/ricarica la pagina: sendBeacon supporta
+    # solo POST, non PATCH, e non può impostare header custom)
     try:
         r = Resume.objects.get(pk=pk)
     except Resume.DoesNotExist:
@@ -663,7 +666,43 @@ def mostra_domande_api(request, resume_id, job_description_id):
 
     if request.method == 'POST':
         save_domande_risposte(resume, domande_job_desc, domande_resume, request.data)
-        return Response({'next': 'personality_test', 'resume_id': resume.id})
+
+        # Il test di personalità non è più raggiunto con un redirect automatico:
+        # si manda un'email al candidato con il link diretto, che sarà l'unico
+        # modo per arrivarci.
+        # NOTA: testo email placeholder, da sostituire con il contenuto definitivo.
+        email_destinatario = _get(resume, 'email', 'mail')
+        if email_destinatario:
+            try:
+                link = request.build_absolute_uri(f"/skillcheck/#/PersonalityTest/{resume.id}")
+                nome_candidato = _get(resume, 'first_name', 'name', default='Candidato/a').strip()
+                jd_title = getattr(job_description, 'title', 'la posizione')
+
+                subject = "Finalizza la tua candidatura"
+                body = (
+                    f"Gentile {nome_candidato},\n\n"
+                    f"Grazie per aver risposto alle domande relative alla tua candidatura "
+                    f"per la posizione di {jd_title}.\n\n"
+                    "Per completare la procedura ti chiediamo di rispondere anche a un breve "
+                    "test di personalità, cliccando sul link qui sotto:\n\n"
+                    f"{link}\n\n"
+                    "Grazie per la disponibilità.\n\n"
+                    "Cordiali saluti,\nIl Team HR - SkillCheck"
+                )
+                email_msg = EmailMessage(
+                    subject=subject,
+                    body=body,
+                    from_email='avvisi.skillcheck@gmail.com',
+                    to=[email_destinatario],
+                )
+                email_msg.send(fail_silently=False)
+            except Exception as e:
+                print(f"Errore invio email finalizzazione candidatura: {e}")
+
+        return Response({
+            'message': 'Grazie! La preghiamo di controllare la sua email per la '
+                        'finalizzazione della sua candidatura.',
+        })
 
     context = build_mostra_domande_context(resume, job_description, domande_job_desc, domande_resume)
     return Response(context)
@@ -693,7 +732,7 @@ def personality_test_api(request, resume_id):
                 continue
 
     resume.risposte_personalita_raw = risposte
-    resume.save()
+    resume.save(update_fields=['risposte_personalita_raw'])
 
     return Response({
         'message': 'Grazie per aver completato il test di personalità! '
@@ -727,3 +766,60 @@ def save_selected_questions_api(request, job_description_id):
 
     next_page = 'dashboard' if getattr(job_description, 'is_public', True) else 'SkillPath'
     return Response({'next': next_page})
+
+
+# ------------ Dipendenti / candidature interne (SkillPath) ------------
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def employees(request):
+    if request.method == 'GET':
+        data = [
+            {'id': e.pk, 'nome': e.nome, 'email': e.email, 'reparto': e.reparto}
+            for e in Employee.objects.all().order_by('nome')
+        ]
+        return Response(data)
+
+    payload = request.data or {}
+    nome = (payload.get('nome') or '').strip()
+    email = (payload.get('email') or '').strip()
+    reparto = (payload.get('reparto') or '').strip()
+
+    if not nome or not email:
+        return Response({'detail': 'nome ed email sono obbligatori'}, status=http_status.HTTP_400_BAD_REQUEST)
+
+    employee = Employee.objects.create(nome=nome, email=email, reparto=reparto)
+    return Response(
+        {'id': employee.pk, 'nome': employee.nome, 'email': employee.email, 'reparto': employee.reparto},
+        status=http_status.HTTP_201_CREATED,
+    )
+
+
+@api_view(['DELETE'])
+@permission_classes([AllowAny])
+def employee_detail(request, pk):
+    employee = get_object_or_404(Employee, pk=pk)
+    employee.delete()
+    return Response(status=http_status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def nominate_candidate(request, job_description_id):
+    """
+    Il recruiter nomina un dipendente come candidato per un annuncio (privato,
+    tipicamente da SkillPath) — nessuna candidatura autonoma, nessun CV.
+    body: { employee_id }
+    """
+    job_description = get_object_or_404(JD, pk=job_description_id)
+    employee_id = (request.data or {}).get('employee_id')
+    if not employee_id:
+        return Response({'detail': 'employee_id obbligatorio'}, status=http_status.HTTP_400_BAD_REQUEST)
+
+    employee = get_object_or_404(Employee, pk=employee_id)
+
+    resume = Resume(name=employee.nome, email=employee.email, job_description=job_description)
+    resume.save()
+    job_description.resumes.add(resume)
+
+    return Response({'resume_id': resume.pk}, status=http_status.HTTP_201_CREATED)

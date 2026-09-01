@@ -17,6 +17,7 @@ import MostraDomande from '../views/MostraDomande.vue';
 import PersonalityTest from '../views/PersonalityTest.vue';
 import SkillPath from '../views/SkillPath.vue';
 import SelectQuestions from '../views/SelectQuestions.vue';
+import Employees from '../views/Employees.vue';
 
 const routes = [
   { path: '/', name: 'home', component: HomeView },
@@ -26,6 +27,7 @@ const routes = [
 
   { path: '/dashboard', name: 'dashboard', component: Dashboard, meta: { requiresAuth: true } },
   { path: '/SkillPath', name: 'SkillPath', component: SkillPath, meta: { requiresAuth: true } },
+  { path: '/Employees', name: 'Employees', component: Employees, meta: { requiresAuth: true } },
   { path: '/Termini-e-condizioni', name: 'Termini-e-condizioni', component: Termini },
   { path: '/Recupero', name: 'Recupero', component: RecuperoPwd },
   { path: '/NuovoAnnuncio', name: 'NuovoAnnuncio', component: NuovoAnnuncio, meta: { requiresAuth: true } },

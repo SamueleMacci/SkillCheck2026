@@ -12,6 +12,10 @@
     <template v-else>
       <h1>Test della personalità</h1>
       <p>Rispondi a tutte le domande.</p>
+      <p class="privacy-notice">
+        Il contenuto delle tue risposte non verrà divulgato e i tuoi dati sensibili
+        saranno trattati in modo riservato e protetto.
+      </p>
 
       <p v-if="loading">Caricamento…</p>
       <p v-else-if="loadError" class="error">{{ loadError }}</p>
@@ -152,5 +156,14 @@ button:disabled {
 }
 .error {
   color: #b00020;
+}
+.privacy-notice {
+  background: #f0f4f8;
+  border: 1px solid #d5dee6;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #444;
+  margin: 12px 0 24px;
 }
 </style>

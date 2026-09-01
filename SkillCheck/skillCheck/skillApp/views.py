@@ -213,6 +213,7 @@ def save_domande_risposte(resume, domande_job_desc, domande_resume, risposte):
     """Salva le risposte alle domande JD/resume/gap per un resume.
     `risposte` è un dict-like (request.POST oppure request.data)."""
     punteggio_affinita = 0
+    totale_domande_si_no = 0
     domande_e_risposte = {}
 
     for chiave, valore in risposte.items():
@@ -223,6 +224,7 @@ def save_domande_risposte(resume, domande_job_desc, domande_resume, risposte):
             except Exception:
                 continue
             domande_e_risposte[testo_domanda] = valore
+            totale_domande_si_no += 1
             if valore == "si":
                 punteggio_affinita += 1
 
@@ -233,6 +235,7 @@ def save_domande_risposte(resume, domande_job_desc, domande_resume, risposte):
             except Exception:
                 continue
             domande_e_risposte[testo_domanda] = valore
+            totale_domande_si_no += 1
             if valore == "si":
                 punteggio_affinita += 1
 
@@ -275,7 +278,12 @@ def save_domande_risposte(resume, domande_job_desc, domande_resume, risposte):
     matrix_payload = build_jd_cv_matrix(jd_skills, cv_skills)
     gaps = extract_skill_gaps(matrix_payload)
 
-    resume.domande_affinity = punteggio_affinita
+    # normalizza su scala 0..10, coerente con score_similarity (altrimenti la
+    # "Media totale" media un conteggio grezzo di risposte con un punteggio 0..10)
+    if totale_domande_si_no > 0:
+        resume.domande_affinity = round((punteggio_affinita / totale_domande_si_no) * 10, 2)
+    else:
+        resume.domande_affinity = 0.0
     base = domande_e_risposte if isinstance(domande_e_risposte, dict) else {}
     base["gap_answers"] = gap_answers
     base["gap_summary"] = gap_summary
@@ -613,8 +621,8 @@ def personality_test(request, resume_id):
         # Django prenderà questo dizionario 'risposte', lo trasformerà in testo
         # e la libreria cryptography lo salverà in formato binario illeggibile nel database.
         resume.risposte_personalita_raw = risposte
-        resume.save()
-        
+        resume.save(update_fields=['risposte_personalita_raw'])
+
         # Renderizza direttamente il messaggio di completamento
         context = {
             'resume': resume,
