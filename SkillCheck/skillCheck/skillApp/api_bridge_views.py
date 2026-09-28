@@ -24,7 +24,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
 
 # --- IMPORT LOCALI ---
-from .models import EmailTemplate, PersonalityCounter, PersonalityQuestion, Employee  # <--- models for mail
+from .models import EmailTemplate, PersonalityCounter, PersonalityQuestion, Employee, EmployeeJobScore  # <--- models for mail
 from .personality_engine.calcolo_personalita import calcola_personalita
 from .utils import genera_consiglio_ia# <--- local ai
 from .utils import compute_satisfaction_percentage
@@ -854,9 +854,19 @@ def _employee_job_compatibility(employee, job_description):
     NOTA: punto di innesto per una futura IA dedicata alla valutazione dei CV:
     basta sostituire il corpo di questa funzione, l'interfaccia (dipendente +
     annuncio -> percentuale 0..100 o None) resta la stessa.
+
+    Il confronto BERT costa O(categorie_annuncio x categorie_cv) per ciascuna
+    delle 3 dimensioni (titoli/competenze/esperienze): per un CV reale può
+    richiedere diversi minuti. Il risultato viene quindi messo in cache per
+    coppia (dipendente, annuncio) e invalidato solo quando il CV cambia
+    (Employee.save()) — vedi EmployeeJobScore.
     """
     if not employee.cv_file:
         return None
+
+    cached = EmployeeJobScore.objects.filter(employee=employee, job_description=job_description).first()
+    if cached is not None:
+        return cached.compatibility
 
     titoli_cv = _parse_stringified_list(employee.titoli_di_studio)
     competenze_cv = _parse_stringified_list(employee.competenze)
@@ -867,7 +877,13 @@ def _employee_job_compatibility(employee, job_description):
     esperienze_score, _ = compute_satisfaction_percentage(job_description.esperienze, esperienze_cv)
 
     media = (titoli_score + competenze_score + esperienze_score) / 3
-    return round(media * 10, 1)
+    compatibility = round(media * 10, 1)
+
+    EmployeeJobScore.objects.update_or_create(
+        employee=employee, job_description=job_description,
+        defaults={'compatibility': compatibility},
+    )
+    return compatibility
 
 
 @api_view(['GET'])

@@ -41,6 +41,9 @@ class Employee(models.Model):
             self.esperienze, self.competenze, self.titoli_di_studio = extract_entities_resume(text)
             self.cv_file.seek(0)
             super().save(*args, **kwargs)
+            # Il CV è cambiato: i punteggi di compatibilità già calcolati non
+            # sono più validi, vanno ricalcolati alla prossima richiesta.
+            self.job_scores.all().delete()
             return
         super().save(*args, **kwargs)
 
@@ -81,6 +84,20 @@ class JobDescription(models.Model):
     def _update_fields(self, fields):
         # Salva solo i campi specificati senza chiamare il metodo save predefinito
         self.__class__.objects.filter(pk=self.pk).update(**{field: getattr(self, field) for field in fields})
+
+
+class EmployeeJobScore(models.Model):
+    """Cache del punteggio di compatibilità CV/annuncio: il confronto passa da
+    3 inferenze BERT con costo O(categorie_annuncio x categorie_cv) — troppo
+    lento (minuti) per essere ricalcolato ad ogni apertura di SkillPath.
+    Invalidata da Employee.save() quando il CV del dipendente cambia."""
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='job_scores')
+    job_description = models.ForeignKey(JobDescription, on_delete=models.CASCADE, related_name='employee_scores')
+    compatibility = models.FloatField()
+    computed_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('employee', 'job_description')
 
 
 class Resume(models.Model):
