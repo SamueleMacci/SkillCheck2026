@@ -8,6 +8,10 @@
       <input v-model="form.nome" type="text" placeholder="Nome e cognome" required />
       <input v-model="form.email" type="email" placeholder="Email" required />
       <input v-model="form.reparto" type="text" placeholder="Reparto (opzionale)" />
+      <label class="cv-label">
+        CV (opzionale):
+        <input type="file" accept=".pdf" @change="onCvChange" />
+      </label>
       <button type="submit" :disabled="saving">{{ saving ? 'Aggiungo…' : 'Aggiungi' }}</button>
     </form>
     <p v-if="formError" class="error">{{ formError }}</p>
@@ -21,6 +25,7 @@
           <th>Nome</th>
           <th>Email</th>
           <th>Reparto</th>
+          <th>CV</th>
           <th></th>
         </tr>
       </thead>
@@ -29,10 +34,14 @@
           <td>{{ e.nome }}</td>
           <td>{{ e.email }}</td>
           <td>{{ e.reparto || '—' }}</td>
+          <td>
+            <a v-if="e.has_cv" :href="e.cv_url" target="_blank" rel="noopener">Vedi CV</a>
+            <span v-else class="hint">Nessun CV</span>
+          </td>
           <td><button class="remove-btn" @click="remove(e)">Rimuovi</button></td>
         </tr>
         <tr v-if="!employees.length">
-          <td colspan="4">Nessun dipendente inserito.</td>
+          <td colspan="5">Nessun dipendente inserito.</td>
         </tr>
       </tbody>
     </table>
@@ -52,6 +61,7 @@ export default {
       saving: false,
       formError: null,
       form: { nome: '', email: '', reparto: '' },
+      cvFile: null,
     };
   },
   async mounted() {
@@ -70,12 +80,16 @@ export default {
         this.loading = false;
       }
     },
+    onCvChange(e) {
+      this.cvFile = e.target.files[0] || null;
+    },
     async addEmployee() {
       this.formError = null;
       this.saving = true;
       try {
-        await createEmployee(this.form);
+        await createEmployee({ ...this.form, cvFile: this.cvFile });
         this.form = { nome: '', email: '', reparto: '' };
+        this.cvFile = null;
         await this.fetchEmployees();
       } catch (e) {
         console.error(e);
@@ -128,6 +142,13 @@ export default {
   padding: 8px;
   border-radius: 6px;
   border: 1px solid #ccc;
+}
+.cv-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #555;
 }
 .add-form button {
   background: rgb(43, 42, 42);

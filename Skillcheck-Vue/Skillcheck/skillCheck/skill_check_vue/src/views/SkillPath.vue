@@ -60,18 +60,24 @@
 
         <div class="nominaBox">
           <h3>Nomina candidato</h3>
+          <p class="hint">
+            Compatibilità calcolata dal confronto CV/annuncio (IA) — dipendenti senza
+            CV caricato non hanno una percentuale.
+          </p>
           <div class="nominaRow">
-            <select v-model="selectedEmployeeId">
-              <option disabled value="">Scegli un dipendente…</option>
-              <option v-for="e in employees" :key="e.id" :value="e.id">
-                {{ e.nome }} ({{ e.email }})
+            <select v-model="selectedEmployeeId" :disabled="loadingScores">
+              <option disabled value="">
+                {{ loadingScores ? 'Calcolo compatibilità…' : 'Scegli un dipendente…' }}
+              </option>
+              <option v-for="e in employeeScores" :key="e.id" :value="e.id">
+                {{ e.nome }} — {{ e.compatibility !== null ? e.compatibility + '% compatibilità' : 'nessun CV' }}
               </option>
             </select>
             <button :disabled="!selectedEmployeeId || nominating" @click="nominate">
               {{ nominating ? 'Nomina…' : 'Nomina' }}
             </button>
           </div>
-          <p v-if="!employees.length" class="hint">
+          <p v-if="!loadingScores && !employeeScores.length" class="hint">
             Nessun dipendente in elenco — <router-link to="/Employees">aggiungine uno</router-link>.
           </p>
           <p v-if="nominateMessage" class="success">{{ nominateMessage }}</p>
@@ -96,7 +102,7 @@
 
 <script>
 import { listJobs } from '@/services/jobs';
-import { listEmployees, nominateCandidate } from '@/services/employees';
+import { nominateCandidate, getEmployeeJobScores } from '@/services/employees';
 export default {
   name: 'SkillPath',
   data() {
@@ -107,7 +113,8 @@ export default {
       errorJobs: null,
       scrittaBianca: require('@/assets/scrittaBianca.png'),
       imgCircle: require('@/assets/ArrowRightIcon.png'),
-      employees: [],
+      employeeScores: [],
+      loadingScores: false,
       selectedEmployeeId: '',
       nominating: false,
       nominateMessage: null,
@@ -127,6 +134,14 @@ export default {
     isAuth() { return !!localStorage.getItem('auth_token'); },
     current() {
       return this.tabs[this.activeTab] || null;
+    },
+  },
+
+  watch: {
+    // ricalcola la compatibilità quando si cambia annuncio selezionato
+    'current.id'() {
+      this.selectedEmployeeId = '';
+      this.fetchEmployeeScores();
     },
   },
 
@@ -164,11 +179,16 @@ export default {
       }
     },
 
-    async fetchEmployees() {
+    async fetchEmployeeScores() {
+      if (!this.current) { this.employeeScores = []; return; }
+      this.loadingScores = true;
       try {
-        this.employees = await listEmployees();
+        this.employeeScores = await getEmployeeJobScores(this.current.id);
       } catch (e) {
         console.error(e);
+        this.employeeScores = [];
+      } finally {
+        this.loadingScores = false;
       }
     },
 
@@ -179,7 +199,7 @@ export default {
       this.nominateError = null;
       try {
         await nominateCandidate(this.current.id, this.selectedEmployeeId);
-        const nome = this.employees.find(e => e.id === this.selectedEmployeeId)?.nome || '';
+        const nome = this.employeeScores.find(e => e.id === this.selectedEmployeeId)?.nome || '';
         this.nominateMessage = `${nome} nominato/a come candidato/a.`;
         this.selectedEmployeeId = '';
         await this.fetchJobs();
@@ -193,7 +213,8 @@ export default {
   },
 
   async mounted() {
-    await Promise.all([this.fetchJobs(), this.fetchEmployees()]);
+    await this.fetchJobs();
+    await this.fetchEmployeeScores();
   },
 };
 </script>

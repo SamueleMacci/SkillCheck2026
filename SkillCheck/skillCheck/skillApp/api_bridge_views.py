@@ -27,6 +27,7 @@ from rest_framework.authtoken.models import Token
 from .models import EmailTemplate, PersonalityCounter, PersonalityQuestion, Employee  # <--- models for mail
 from .personality_engine.calcolo_personalita import calcola_personalita
 from .utils import genera_consiglio_ia# <--- local ai
+from .utils import compute_satisfaction_percentage
 from .forms import ResumeForm
 from .views import (
     _get_domande_job_desc_resume,
@@ -770,29 +771,40 @@ def save_selected_questions_api(request, job_description_id):
 
 # ------------ Dipendenti / candidature interne (SkillPath) ------------
 
+def _employee_to_dict(request, e):
+    cv_url = None
+    if e.cv_file:
+        try:
+            cv_url = request.build_absolute_uri(e.cv_file.url)
+        except Exception:
+            cv_url = None
+    return {
+        'id': e.pk, 'nome': e.nome, 'email': e.email, 'reparto': e.reparto,
+        'has_cv': bool(e.cv_file), 'cv_url': cv_url,
+    }
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def employees(request):
     if request.method == 'GET':
-        data = [
-            {'id': e.pk, 'nome': e.nome, 'email': e.email, 'reparto': e.reparto}
-            for e in Employee.objects.all().order_by('nome')
-        ]
+        data = [_employee_to_dict(request, e) for e in Employee.objects.all().order_by('nome')]
         return Response(data)
 
     payload = request.data or {}
     nome = (payload.get('nome') or '').strip()
     email = (payload.get('email') or '').strip()
     reparto = (payload.get('reparto') or '').strip()
+    cv_file = request.FILES.get('cv_file')
 
     if not nome or not email:
         return Response({'detail': 'nome ed email sono obbligatori'}, status=http_status.HTTP_400_BAD_REQUEST)
 
-    employee = Employee.objects.create(nome=nome, email=email, reparto=reparto)
-    return Response(
-        {'id': employee.pk, 'nome': employee.nome, 'email': employee.email, 'reparto': employee.reparto},
-        status=http_status.HTTP_201_CREATED,
-    )
+    employee = Employee(nome=nome, email=email, reparto=reparto)
+    if cv_file:
+        employee.cv_file = cv_file
+    employee.save()
+    return Response(_employee_to_dict(request, employee), status=http_status.HTTP_201_CREATED)
 
 
 @api_view(['DELETE'])
@@ -823,3 +835,58 @@ def nominate_candidate(request, job_description_id):
     job_description.resumes.add(resume)
 
     return Response({'resume_id': resume.pk}, status=http_status.HTTP_201_CREATED)
+
+
+def _parse_stringified_list(raw):
+    """Le liste (esperienze/competenze/titoli) vengono salvate come TextField
+    col repr Python di una lista (es. \"['Python', 'Django']\") — stessa
+    convenzione già usata altrove nel progetto per campi analoghi."""
+    raw = (raw or "").strip("[]")
+    return [d.strip().strip("'").strip() for d in raw.split("',") if d.strip().strip("'")]
+
+
+def _employee_job_compatibility(employee, job_description):
+    """
+    Percentuale di compatibilità (0-100) tra il CV di un dipendente e un
+    annuncio, riusando lo stesso motore di confronto (BERT) già usato per le
+    candidature esterne — vedi Resume.save() / compute_satisfaction_percentage.
+
+    NOTA: punto di innesto per una futura IA dedicata alla valutazione dei CV:
+    basta sostituire il corpo di questa funzione, l'interfaccia (dipendente +
+    annuncio -> percentuale 0..100 o None) resta la stessa.
+    """
+    if not employee.cv_file:
+        return None
+
+    titoli_cv = _parse_stringified_list(employee.titoli_di_studio)
+    competenze_cv = _parse_stringified_list(employee.competenze)
+    esperienze_cv = _parse_stringified_list(employee.esperienze)
+
+    titoli_score, _ = compute_satisfaction_percentage(job_description.titoli_di_studio, titoli_cv)
+    competenze_score, _ = compute_satisfaction_percentage(job_description.competenze, competenze_cv)
+    esperienze_score, _ = compute_satisfaction_percentage(job_description.esperienze, esperienze_cv)
+
+    media = (titoli_score + competenze_score + esperienze_score) / 3
+    return round(media * 10, 1)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def employee_job_scores(request, job_description_id):
+    """
+    Per l'annuncio dato, calcola la % di compatibilità di ogni dipendente che
+    ha un CV caricato, ordinati dal più compatibile. I dipendenti senza CV
+    restano in fondo con compatibility: null.
+    """
+    job_description = get_object_or_404(JD, pk=job_description_id)
+
+    results = []
+    for e in Employee.objects.all().order_by('nome'):
+        compatibility = _employee_job_compatibility(e, job_description)
+        results.append({
+            'id': e.pk, 'nome': e.nome, 'email': e.email, 'reparto': e.reparto,
+            'has_cv': bool(e.cv_file), 'compatibility': compatibility,
+        })
+
+    results.sort(key=lambda r: (r['compatibility'] is None, -(r['compatibility'] or 0)))
+    return Response(results)

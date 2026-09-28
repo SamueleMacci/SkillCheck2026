@@ -15,9 +15,34 @@ class Employee(models.Model):
     nome = models.CharField(max_length=255)
     email = models.EmailField()
     reparto = models.CharField(max_length=255, blank=True)
+    cv_file = models.FileField(upload_to='employee_cvs/', null=True, blank=True)
+    esperienze = models.TextField(blank=True)
+    competenze = models.TextField(blank=True)
+    titoli_di_studio = models.TextField(blank=True)
 
     def __str__(self):
         return self.nome
+
+    def save(self, *args, **kwargs):
+        # Stesso principio applicato a Resume.save(): la ri-estrazione del CV
+        # (PDF + NER) gira solo su un salvataggio pieno che tocca cv_file,
+        # non su un update_fields mirato (es. nome/reparto).
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None and 'cv_file' not in update_fields:
+            super().save(*args, **kwargs)
+            return
+        if self.cv_file:
+            # Niente `with ... open()`: per un file piccolo (InMemoryUploadedFile)
+            # chiuderebbe lo stream prima che Django lo rilegga per salvarlo su
+            # storage in super().save(), causando "I/O operation on closed file".
+            self.cv_file.seek(0)
+            pdf_content = self.cv_file.read()
+            text = extract_text_from_pdf_content(pdf_content)
+            self.esperienze, self.competenze, self.titoli_di_studio = extract_entities_resume(text)
+            self.cv_file.seek(0)
+            super().save(*args, **kwargs)
+            return
+        super().save(*args, **kwargs)
 
 class JobDescription(models.Model):
     title = models.CharField(max_length=255)
