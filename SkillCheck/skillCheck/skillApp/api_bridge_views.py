@@ -25,6 +25,7 @@ from rest_framework.authtoken.models import Token
 
 # --- IMPORT LOCALI ---
 from .models import EmailTemplate, PersonalityCounter, PersonalityQuestion, Employee, EmployeeJobScore  # <--- models for mail
+from .employee_import import import_employees_from_csv
 from .personality_engine.calcolo_personalita import calcola_personalita
 from .utils import genera_consiglio_ia# <--- local ai
 from .utils import compute_satisfaction_percentage
@@ -906,3 +907,38 @@ def employee_job_scores(request, job_description_id):
 
     results.sort(key=lambda r: (r['compatibility'] is None, -(r['compatibility'] or 0)))
     return Response(results)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def import_employees_api(request):
+    """
+    Import in blocco dei dipendenti da un CSV caricato dal sito (stessa logica
+    del comando da terminale `import_employees`, vedi employee_import.py).
+    Il CSV va inviato nel campo 'csv_file'; i PDF citati nella colonna
+    cv_path del CSV vanno inviati nel campo 'cv_files' (più file, ognuno
+    abbinato per nome file). 'update' (truthy) aggiorna i dipendenti già
+    esistenti (stessa email) invece di saltarli.
+    """
+    csv_file = request.FILES.get('csv_file')
+    if not csv_file:
+        return Response({'detail': 'csv_file mancante'}, status=http_status.HTTP_400_BAD_REQUEST)
+
+    cv_by_name = {f.name: f for f in request.FILES.getlist('cv_files')}
+
+    def resolve_cv(rel_path):
+        basename = rel_path.replace('\\', '/').rsplit('/', 1)[-1]
+        return cv_by_name.get(basename)
+
+    update_existing = str(request.data.get('update', '')).strip().lower() in ('1', 'true', 'si', 'sì', 'yes')
+
+    try:
+        decoded = csv_file.read().decode('utf-8-sig').splitlines()
+        stats, messages = import_employees_from_csv(decoded, resolve_cv, update_existing=update_existing)
+    except ValueError as exc:
+        return Response({'detail': str(exc)}, status=http_status.HTTP_400_BAD_REQUEST)
+    except UnicodeDecodeError:
+        return Response({'detail': 'Impossibile leggere il CSV: verifica che sia salvato come testo/UTF-8.'},
+                         status=http_status.HTTP_400_BAD_REQUEST)
+
+    return Response({'stats': stats, 'messages': messages})

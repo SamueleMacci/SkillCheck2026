@@ -29,3 +29,13 @@ export function nominateCandidate(jobCode, employeeId) {
 export function getEmployeeJobScores(jobCode) {
   return api.get(`/jobs/${jobCode}/employee_scores/`).then(r => r.data)
 }
+
+export function importEmployeesCsv({ csvFile, cvFiles = [], update = false }) {
+  const formData = new FormData()
+  formData.append('csv_file', csvFile)
+  cvFiles.forEach(f => formData.append('cv_files', f))
+  formData.append('update', update ? '1' : '0')
+  return api
+    .post('/employees/import/', formData, { headers: { 'Content-Type': undefined } })
+    .then(r => r.data)
+}
